@@ -24,6 +24,20 @@ The current development environment includes:
 - **NFC** – Planned device pairing/connectivity functionality
 - **GitHub** – Source control and collaborative development
 
+# Libraries and Tools
+
+The project uses a range of libraries and development tools to support application development, connectivity and backend functionality.
+
+Current tools and technologies include:
+- React Native
+- Expo Go
+- JavaScript
+- TypeScript
+- Firebase
+- Bluetooth Low Energy (BLE)
+- NFC
+- GitHub
+
 # Project Structure
 
 The repository currently contains the following main components:
