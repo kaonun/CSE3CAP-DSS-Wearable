@@ -5,15 +5,13 @@ import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 
-export default function SetUp() {
+export default function LogInScreen() {
   const router = useRouter();
-
-  useEffect(() => {}, []);
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Text>Welcome to the DSS Wearable App!</Text>
+        <Text>WIP Login Screen</Text>
       </SafeAreaView>
     </ThemedView>
   );
@@ -27,10 +25,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
     alignItems: "center",
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
   },
 });
