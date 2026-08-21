@@ -1,3 +1,4 @@
+import { loginAnonymously } from "../../../scripts/authServices";
 import { StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedView } from "@/components/themed-view";
@@ -7,6 +8,13 @@ import { useEffect } from "react";
 
 export default function LogInScreen() {
   const router = useRouter();
+
+  useEffect(() => {
+    const initiateLogin = async () => {
+      await loginAnonymously(); // Silently log in the user anonymously to enable backend interactions without requiring immediate authentication.
+    };
+    initiateLogin();
+  }, []);
 
   return (
     <ThemedView style={styles.container}>
