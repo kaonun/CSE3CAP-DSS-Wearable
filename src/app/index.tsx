@@ -241,8 +241,14 @@ export default function WearableScreen() {
                   return (
                     <View key={`${entry.id}-${entry.connectedAt}-${index}`}>
                       <View style={styles.historyRow}>
+                        {/* Icon reflects how the device was found — scanned or
+                            tapped — which is what makes an entry recognisable. */}
                         <View style={[styles.historyIcon, { backgroundColor: theme.fill }]}>
-                          <Ionicons name="watch-outline" size={18} color={theme.tint} />
+                          <Ionicons
+                            name={entry.via === 'nfc' ? 'radio' : 'bluetooth'}
+                            size={18}
+                            color={theme.tint}
+                          />
                         </View>
                         <View style={styles.flex}>
                           <ThemedText type="body" numberOfLines={1}>

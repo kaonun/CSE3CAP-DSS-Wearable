@@ -27,7 +27,7 @@ export type ConnectSheetProps = {
   connectedIds: string[];
   bleError: string | null;
   onScan: () => void;
-  onConnect: (deviceId: string) => void;
+  onConnect: (deviceId: string, via: 'bluetooth' | 'nfc') => void;
   nfc: {
     tagId: string | null;
     reading: boolean;
@@ -71,7 +71,7 @@ export function ConnectSheet({
     if (method !== 'nfc' || !nfc.tagId) return;
     if (handledTag.current === nfc.tagId) return;
     handledTag.current = nfc.tagId;
-    onConnect(nfc.tagId);
+    onConnect(nfc.tagId, 'nfc');
     onClose();
   }, [method, nfc.tagId, onConnect, onClose]);
 
@@ -172,7 +172,7 @@ export function ConnectSheet({
                           connected={connectedIds.includes(device.id)}
                           connecting={connectingId === device.id}
                           onPress={() => {
-                            onConnect(device.id);
+                            onConnect(device.id, 'bluetooth');
                             onClose();
                           }}
                         />

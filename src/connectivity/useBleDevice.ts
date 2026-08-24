@@ -6,6 +6,7 @@ import {
   ConnectedDevice,
   ConnectionHistoryEntry,
   ConnectionStatus,
+  DiscoverySource,
   SensorReading,
 } from './types';
 
@@ -56,7 +57,7 @@ export function useBleDevice(onReading?: BleReadingHandler) {
   // these in effect dependency arrays (the connect sheet auto-connects on an
   // NFC tag read), and unstable identities there re-fire the effect on every
   // render — which previously produced a connect/fail/reconnect loop.
-  const connect = useCallback(async (deviceId: string) => {
+  const connect = useCallback(async (deviceId: string, via: DiscoverySource = 'bluetooth') => {
     // Ignore repeat requests for a device that is already wired up.
     if (connectedIds.current.has(deviceId)) return;
     setStatus('connecting');
@@ -109,7 +110,7 @@ export function useBleDevice(onReading?: BleReadingHandler) {
           : [...current, {id: deviceId, name, heartRate: null, history: [], updatedAt: null}],
       );
       setConnectionHistory(current => [
-        {id: deviceId, name, connectedAt: Date.now()},
+        {id: deviceId, name, connectedAt: Date.now(), via},
         ...current.filter(entry => entry.id !== deviceId),
       ].slice(0, 5));
       setStatus('connected');
