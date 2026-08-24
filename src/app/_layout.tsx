@@ -48,12 +48,21 @@ function AuthGate() {
     );
   }
 
-  if (configured && !user) return <LoginScreen />;
-
+  // AnimatedSplashOverlay owns the SplashScreen.hideAsync() call (see its
+  // onLayout), so it must render regardless of destination — it sits on top
+  // as an absolute overlay and reveals whichever screen is underneath once
+  // it finishes. Scoping it to only one branch left the splash stuck forever
+  // whenever the other branch was taken.
   return (
-    <ActivityTracker>
+    <>
+      {configured && !user ? (
+        <LoginScreen />
+      ) : (
+        <ActivityTracker>
+          <AppTabs />
+        </ActivityTracker>
+      )}
       <AnimatedSplashOverlay />
-      <AppTabs />
-    </ActivityTracker>
+    </>
   );
 }
