@@ -1,4 +1,5 @@
-import {useCallback, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import {AppState} from 'react-native';
 import {cancelNfcRead, readNfcTag} from './nfcService';
 
 export function useNfc() {
@@ -45,6 +46,29 @@ export function useNfc() {
   const reset = useCallback(() => {
     setTagId(null);
     setError(null);
+  }, []);
+
+  /**
+   * Release the NFC radio whenever this screen goes away or the app leaves the
+   * foreground. An open technology request suspends the system's own tag
+   * discovery, so if the process is killed while one is pending — which is
+   * exactly what happens after backgrounding — the phone stops detecting tags
+   * entirely, with no prompt and no vibration, until NFC is toggled.
+   */
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') {
+        cancelRequested.current = true;
+        setReading(false);
+        void cancelNfcRead().catch(() => undefined);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      cancelRequested.current = true;
+      void cancelNfcRead().catch(() => undefined);
+    };
   }, []);
 
   return {tagId, reading, error, readTag, cancel, reset};

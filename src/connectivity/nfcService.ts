@@ -29,6 +29,25 @@ const BLUETOOTH_OOB_MIME = 'application/vnd.bluetooth.ep.oob';
 let nativeNfcStarted = false;
 let activeNfc: NfcModule['default'] | undefined;
 
+/** How long to wait for a tag before releasing the NFC radio. */
+const READ_TIMEOUT_MS = 25_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function validateTagId(value: unknown): string {
   const normalized = typeof value === 'string' ? value.replace(/[\u0000\u0001]/g, '').trim() : '';
   const compactMac = normalized.replace(/[-\s]/g, ':').replace(/:{2,}/g, ':');
@@ -132,7 +151,15 @@ export async function readNfcTag(): Promise<string> {
     await nfc.requestTechnology(NfcManagerModule.NfcTech.Ndef, {
       alertMessage: 'Hold the DSS wearable NFC tag near this phone',
     });
-    const tag = await nfc.getTag();
+    // Holding a technology request suspends the system's own tag discovery, so
+    // an unbounded wait leaves the phone unable to detect tags at all — no
+    // system prompt, no vibration — until the request is released. Give up
+    // after a while so the radio always returns to the user.
+    const tag = await withTimeout(
+      nfc.getTag(),
+      READ_TIMEOUT_MS,
+      'No NFC tag detected. Try again and hold the tag against the back of the phone.',
+    );
     const records = tag?.ndefMessage ?? [];
 
     const textRecord = records.find(item => isTextRecord(item, NfcManagerModule.Ndef));
