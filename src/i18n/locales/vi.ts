@@ -80,6 +80,9 @@ export const vi: Messages = {
   noDeviceConnected: 'Chưa kết nối thiết bị',
   noDeviceConnectedHelp: 'Kết nối thiết bị để xem số đo trực tiếp.',
   disconnectedFrom: 'Đã ngắt kết nối khỏi {device}',
+  durationSeconds: '{v}g',
+  durationMinutes: '{v}p',
+  durationHours: '{v}h',
 
   settings: 'Cài đặt',
   settingsSubtitle: 'Cá nhân hóa trải nghiệm DSS Wearable của bạn.',

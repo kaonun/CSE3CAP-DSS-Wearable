@@ -80,6 +80,10 @@ export type Messages = {
   noDeviceConnected: string;
   noDeviceConnectedHelp: string;
   disconnectedFrom: string;
+  /** Compact duration units, e.g. "5m", "1h 4m". */
+  durationSeconds: string;
+  durationMinutes: string;
+  durationHours: string;
   // Settings
   settings: string;
   settingsSubtitle: string;

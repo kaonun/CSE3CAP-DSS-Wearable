@@ -34,11 +34,25 @@ export function useBleDevice(onReading?: BleReadingHandler) {
   const connectedIds = useRef(new Set<string>());
   const devicesRef = useRef<BleDeviceInfo[]>([]);
   devicesRef.current = devices;
+  const connectedRef = useRef<ConnectedDevice[]>([]);
+  connectedRef.current = connectedDevices;
 
   useEffect(() => () => {
     stopBleScan();
     destroyBle();
     connectedIds.current.clear();
+  }, []);
+
+  /** Stamps the end of a session so its duration stops advancing. */
+  const closeHistoryEntry = useCallback((deviceId?: string) => {
+    const endedAt = Date.now();
+    setConnectionHistory(current =>
+      current.map(entry =>
+        (deviceId === undefined || entry.id === deviceId) && entry.disconnectedAt === null
+          ? {...entry, disconnectedAt: endedAt}
+          : entry,
+      ),
+    );
   }, []);
 
   const scan = useCallback(async () => {
@@ -83,6 +97,7 @@ export function useBleDevice(onReading?: BleReadingHandler) {
       }, connectError => {
         connectedIds.current.delete(deviceId);
         setConnectedDevices(current => current.filter(device => device.id !== deviceId));
+        closeHistoryEntry(deviceId);
         setError(connectError.message);
         setStatus(connectedIds.current.size ? 'connected' : 'error');
       }, resolvedName => {
@@ -110,7 +125,7 @@ export function useBleDevice(onReading?: BleReadingHandler) {
           : [...current, {id: deviceId, name, heartRate: null, history: [], updatedAt: null}],
       );
       setConnectionHistory(current => [
-        {id: deviceId, name, connectedAt: Date.now(), via},
+        {id: deviceId, name, connectedAt: Date.now(), disconnectedAt: null, via},
         ...current.filter(entry => entry.id !== deviceId),
       ].slice(0, 5));
       setStatus('connected');
@@ -120,28 +135,34 @@ export function useBleDevice(onReading?: BleReadingHandler) {
     } finally {
       setConnectingDeviceId(null);
     }
-  }, []);
+  }, [closeHistoryEntry]);
 
   /** Disconnects one device, or every device when no id is given. */
   const disconnect = useCallback((deviceId?: string) => {
     setStatus('disconnecting');
 
-    // Capture names before the entries are removed, so the confirmation can
-    // say which device it was.
-    setConnectedDevices(current => {
-      const removed = deviceId ? current.filter(device => device.id === deviceId) : current;
-      const names = removed.map(device => device.name || device.id);
-      if (names.length > 0) setDisconnectedNames(names);
-      return deviceId ? current.filter(device => device.id !== deviceId) : [];
-    });
+    // Capture names before the entries go, so the confirmation can say which
+    // device it was. Read from the ref rather than inside the updater below —
+    // a state updater must be pure, and setting other state from within one
+    // triggers "state update on a component that hasn't mounted yet".
+    const removed = deviceId
+      ? connectedRef.current.filter(device => device.id === deviceId)
+      : connectedRef.current;
+    const names = removed.map(device => device.name || device.id);
+    if (names.length > 0) setDisconnectedNames(names);
+
+    setConnectedDevices(current =>
+      deviceId ? current.filter(device => device.id !== deviceId) : [],
+    );
 
     disconnectBleDevice(deviceId);
+    closeHistoryEntry(deviceId);
     if (deviceId) connectedIds.current.delete(deviceId);
     else connectedIds.current.clear();
 
     setError(null);
     setStatus(connectedIds.current.size ? 'connected' : 'idle');
-  }, []);
+  }, [closeHistoryEntry]);
 
   /** Clears the disconnect confirmation after a moment. */
   useEffect(() => {

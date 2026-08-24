@@ -80,6 +80,9 @@ export const id: Messages = {
   noDeviceConnected: 'Tidak ada perangkat terhubung',
   noDeviceConnectedHelp: 'Hubungkan perangkat untuk melihat pembacaan langsung.',
   disconnectedFrom: 'Terputus dari {device}',
+  durationSeconds: '{v}d',
+  durationMinutes: '{v}mnt',
+  durationHours: '{v}j',
 
   settings: 'Pengaturan',
   settingsSubtitle: 'Personalisasi pengalaman DSS Wearable Anda.',

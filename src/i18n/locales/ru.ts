@@ -80,6 +80,9 @@ export const ru: Messages = {
   noDeviceConnected: 'Нет подключённых устройств',
   noDeviceConnectedHelp: 'Подключите устройство, чтобы видеть показания в реальном времени.',
   disconnectedFrom: 'Отключено от {device}',
+  durationSeconds: '{v} с',
+  durationMinutes: '{v} мин',
+  durationHours: '{v} ч',
 
   settings: 'Настройки',
   settingsSubtitle: 'Настройте DSS Wearable под себя.',

@@ -81,6 +81,9 @@ export const en: Messages = {
   noDeviceConnected: 'No device connected',
   noDeviceConnectedHelp: 'Connect a wearable to see live readings.',
   disconnectedFrom: 'Disconnected from {device}',
+  durationSeconds: '{v}s',
+  durationMinutes: '{v}m',
+  durationHours: '{v}h',
 
   settings: 'Settings',
   settingsSubtitle: 'Personalise your DSS Wearable experience.',

@@ -80,6 +80,9 @@ export const tr: Messages = {
   noDeviceConnected: 'Bağlı cihaz yok',
   noDeviceConnectedHelp: 'Canlı ölçümleri görmek için bir cihaz bağlayın.',
   disconnectedFrom: '{device} bağlantısı kesildi',
+  durationSeconds: '{v}sn',
+  durationMinutes: '{v}dk',
+  durationHours: '{v}sa',
 
   settings: 'Ayarlar',
   settingsSubtitle: 'DSS Wearable deneyiminizi kişiselleştirin.',

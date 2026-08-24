@@ -28,6 +28,8 @@ export type ConnectionHistoryEntry = {
   /** Null when the peripheral advertised no name. */
   name: string | null;
   connectedAt: number;
+  /** Null while the device is still connected. */
+  disconnectedAt: number | null;
   via: DiscoverySource;
 };
 

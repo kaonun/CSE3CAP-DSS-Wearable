@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectSheet } from '@/components/connect-sheet';
+import { SessionDuration } from '@/components/session-duration';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/surface';
@@ -263,9 +264,15 @@ export default function WearableScreen() {
                             {live ? t.connected : t.bluetoothWearable}
                           </ThemedText>
                         </View>
-                        <ThemedText type="footnote" themeColor="textTertiary">
-                          {formatClock(entry.connectedAt)}
-                        </ThemedText>
+                        <View style={styles.historyMeta}>
+                          <ThemedText type="footnote" themeColor="textTertiary">
+                            {formatClock(entry.connectedAt)}
+                          </ThemedText>
+                          <SessionDuration
+                            connectedAt={entry.connectedAt}
+                            disconnectedAt={entry.disconnectedAt}
+                          />
+                        </View>
                       </View>
                       {index < ble.connectionHistory.length - 1 ? (
                         <View style={[styles.separator, { backgroundColor: theme.separator }]} />
@@ -405,6 +412,7 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.three,
   },
+  historyMeta: { alignItems: 'flex-end', gap: 1 },
   historyIcon: {
     width: 34,
     height: 34,
