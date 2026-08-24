@@ -36,6 +36,8 @@ export const pt: Messages = {
 
   wearable: 'Dispositivo',
   homeSubtitle: 'Uma vista simples da sua ligação em direto.',
+  appName: 'DSS Wearable',
+  metrics: 'Métricas',
   connection: 'Ligação',
   signal: 'Sinal',
   ready: 'Pronto',

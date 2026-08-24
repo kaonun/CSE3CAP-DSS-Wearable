@@ -36,6 +36,8 @@ export const pl: Messages = {
 
   wearable: 'Urządzenie',
   homeSubtitle: 'Spokojny widok Twojego połączenia na żywo.',
+  appName: 'DSS Wearable',
+  metrics: 'Pomiary',
   connection: 'Połączenie',
   signal: 'Sygnał',
   ready: 'Gotowe',

@@ -83,9 +83,9 @@ export default function WearableScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <ThemedText type="largeTitle">{t.wearable}</ThemedText>
+            <ThemedText type="largeTitle">{t.appName}</ThemedText>
             <ThemedText type="subhead" themeColor="textSecondary">
-              {t.homeSubtitle}
+              {t.metrics}
             </ThemedText>
           </View>
 

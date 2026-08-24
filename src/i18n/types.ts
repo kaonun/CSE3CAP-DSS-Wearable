@@ -36,6 +36,8 @@ export type Messages = {
   // Home / wearable
   wearable: string;
   homeSubtitle: string;
+  appName: string;
+  metrics: string;
   connection: string;
   signal: string;
   ready: string;

@@ -36,6 +36,8 @@ export const ja: Messages = {
 
   wearable: 'デバイス',
   homeSubtitle: 'ライブ接続をシンプルに表示します。',
+  appName: 'DSS Wearable',
+  metrics: 'メトリクス',
   connection: '接続',
   signal: '信号',
   ready: '準備完了',

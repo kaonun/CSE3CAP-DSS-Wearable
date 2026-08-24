@@ -36,6 +36,8 @@ export const zh: Messages = {
 
   wearable: '设备',
   homeSubtitle: '简洁查看您的实时连接。',
+  appName: 'DSS Wearable',
+  metrics: '指标',
   connection: '连接',
   signal: '信号',
   ready: '就绪',

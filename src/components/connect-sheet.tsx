@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,6 +34,7 @@ export type ConnectSheetProps = {
     error: string | null;
     readTag: () => void;
     cancel: () => void;
+    reset: () => void;
   };
 };
 
@@ -52,21 +53,31 @@ export function ConnectSheet({
   const theme = useTheme();
   const { t } = useI18n();
   const [method, setMethod] = useState<Method>('choose');
+  // Remembers which tag we already acted on. Without this, any extra run of the
+  // effect below fires a second connect for the same tag, and the resulting
+  // connect/fail/retry churn shows up as rapid flicker between states.
+  const handledTag = useRef<string | null>(null);
 
   // Reset to the menu each time the sheet opens.
   useEffect(() => {
-    if (visible) setMethod('choose');
+    if (visible) {
+      setMethod('choose');
+      handledTag.current = null;
+    }
   }, [visible]);
 
   // A tag read hands back a device id; connect to it and close.
   useEffect(() => {
     if (method !== 'nfc' || !nfc.tagId) return;
+    if (handledTag.current === nfc.tagId) return;
+    handledTag.current = nfc.tagId;
     onConnect(nfc.tagId);
     onClose();
   }, [method, nfc.tagId, onConnect, onClose]);
 
   const dismiss = () => {
     if (nfc.reading) nfc.cancel();
+    nfc.reset();
     onClose();
   };
 

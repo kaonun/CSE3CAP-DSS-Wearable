@@ -36,6 +36,8 @@ export const ar: Messages = {
 
   wearable: 'الجهاز',
   homeSubtitle: 'عرض هادئ لاتصالك المباشر.',
+  appName: 'DSS Wearable',
+  metrics: 'المقاييس',
   connection: 'الاتصال',
   signal: 'الإشارة',
   ready: 'جاهز',

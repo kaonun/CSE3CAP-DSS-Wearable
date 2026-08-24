@@ -36,6 +36,8 @@ export const tr: Messages = {
 
   wearable: 'Cihaz',
   homeSubtitle: 'Canlı bağlantınızın sade bir görünümü.',
+  appName: 'DSS Wearable',
+  metrics: 'Ölçümler',
   connection: 'Bağlantı',
   signal: 'Sinyal',
   ready: 'Hazır',

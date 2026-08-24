@@ -36,6 +36,8 @@ export const vi: Messages = {
 
   wearable: 'Thiết bị',
   homeSubtitle: 'Xem kết nối trực tiếp một cách gọn gàng.',
+  appName: 'DSS Wearable',
+  metrics: 'Chỉ số',
   connection: 'Kết nối',
   signal: 'Tín hiệu',
   ready: 'Sẵn sàng',

@@ -36,6 +36,8 @@ export const ko: Messages = {
 
   wearable: '기기',
   homeSubtitle: '실시간 연결을 간결하게 보여줍니다.',
+  appName: 'DSS Wearable',
+  metrics: '측정값',
   connection: '연결',
   signal: '신호',
   ready: '준비됨',

@@ -36,6 +36,8 @@ export const ru: Messages = {
 
   wearable: 'Устройство',
   homeSubtitle: 'Спокойный обзор вашего активного подключения.',
+  appName: 'DSS Wearable',
+  metrics: 'Показатели',
   connection: 'Подключение',
   signal: 'Сигнал',
   ready: 'Готово',
