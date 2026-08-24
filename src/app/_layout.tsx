@@ -9,7 +9,9 @@ import AppTabs from '@/components/app-tabs';
 import { Colors } from '@/constants/theme';
 import { I18nProvider, useI18n } from '@/i18n';
 import { ActivityTracker, AuthProvider, useAuth } from '@/auth';
-import LoginScreen from './login';
+// Lives outside app/ on purpose: the auth gate renders it directly, and any
+// file under app/ is registered as a route and shows up as its own tab.
+import LoginScreen from '@/components/login-screen';
 
 SplashScreen.preventAutoHideAsync();
 
