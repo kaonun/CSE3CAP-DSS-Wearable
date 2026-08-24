@@ -1,9 +1,10 @@
 import {BleDeviceInfo, BleReadingHandler, SensorReading} from './types';
 
 export const MOCK_DEVICES: BleDeviceInfo[] = [
-  {id: 'mock-wristband-01', name: 'Mock Wristband'},
-  {id: 'mock-chest-02', name: 'Mock Chest Strap'},
-  {id: 'mock-ring-03', name: 'Mock Ring'},
+  {id: 'mock-wristband-01', name: 'Mock Wristband', rssi: -48, advertisesHeartRate: true},
+  {id: 'mock-chest-02', name: 'Mock Chest Strap', rssi: -63, advertisesHeartRate: true},
+  {id: 'mock-ring-03', name: 'Mock Ring', rssi: -71, advertisesHeartRate: false},
+  {id: 'mock-unnamed-04', name: null, rssi: -88, advertisesHeartRate: false},
 ];
 
 const timers = new Map<string, ReturnType<typeof setInterval>>();

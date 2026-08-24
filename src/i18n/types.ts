@@ -65,6 +65,14 @@ export type Messages = {
   recentActivity: string;
   connectedDevices: string;
   bluetoothWearable: string;
+  connectDevice: string;
+  chooseMethod: string;
+  scanNearby: string;
+  scanNearbyHelp: string;
+  tapTagHelp: string;
+  noDevicesFound: string;
+  heartRateSensor: string;
+  unnamedDevice: string;
   // Settings
   settings: string;
   settingsSubtitle: string;

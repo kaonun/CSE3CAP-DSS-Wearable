@@ -6,9 +6,17 @@ import {BleDeviceInfo, BleReadingHandler} from './types';
 
 type ErrorHandler = (error: Error) => void;
 
+type ScannedDevice = {
+  id: string;
+  name?: string | null;
+  localName?: string | null;
+  rssi?: number | null;
+  serviceUUIDs?: string[] | null;
+};
+
 type BleManagerLike = {
   state: () => Promise<string>;
-  startDeviceScan: (uuids: string[] | null, options: object | null, listener: (error: Error | null, device: {id: string; name?: string | null} | null) => void) => void;
+  startDeviceScan: (uuids: string[] | null, options: object | null, listener: (error: Error | null, device: ScannedDevice | null) => void) => void;
   stopDeviceScan: () => void;
   connectToDevice: (id: string) => Promise<{discoverAllServicesAndCharacteristics: () => Promise<unknown>; cancelConnection: () => Promise<unknown>; monitorCharacteristicForService: (service: string, characteristic: string, listener: (error: Error | null, characteristic: {value?: string | null} | null) => void) => {remove: () => void}; onDisconnected: (listener: (error: Error | null) => void) => {remove: () => void}}>;
   destroy: () => void;
@@ -48,7 +56,21 @@ export async function scanBleDevices(): Promise<BleDeviceInfo[]> {
       clearTimeout(timeout);
       bleManager.stopDeviceScan();
       if (stopActiveScan === finish) stopActiveScan = undefined;
-      if (error) reject(error); else resolve(Array.from(found.values()));
+      if (error) {
+        reject(error);
+        return;
+      }
+      // Rank what the user most likely wants first: real heart-rate sensors,
+      // then anything that bothered to advertise a name, then by signal
+      // strength. Without this a nearby TV or soundbar outranks the wearable.
+      const ranked = Array.from(found.values()).sort((first, second) => {
+        if (first.advertisesHeartRate !== second.advertisesHeartRate) {
+          return first.advertisesHeartRate ? -1 : 1;
+        }
+        if (!!first.name !== !!second.name) return first.name ? -1 : 1;
+        return (second.rssi ?? -999) - (first.rssi ?? -999);
+      });
+      resolve(ranked);
     };
     const timeout = setTimeout(() => finish(), 8000);
     stopActiveScan = finish;
@@ -58,7 +80,16 @@ export async function scanBleDevices(): Promise<BleDeviceInfo[]> {
           finish(new Error(`Bluetooth scan could not start: ${error.message}`));
           return;
         }
-        if (device?.id) found.set(device.id, {id: device.id, name: device.name?.trim() || 'Unnamed wearable'});
+        if (!device?.id) return;
+        const advertised = (device.name ?? device.localName)?.trim();
+        found.set(device.id, {
+          id: device.id,
+          name: advertised || null,
+          rssi: typeof device.rssi === 'number' ? device.rssi : null,
+          advertisesHeartRate: (device.serviceUUIDs ?? []).some(
+            uuid => uuid.toLowerCase() === HEART_RATE_SERVICE_UUID.toLowerCase(),
+          ),
+        });
       });
     } catch (error: unknown) {
       finish(error instanceof Error ? new Error(`Bluetooth scan could not start: ${error.message}`) : new Error('BLE scan could not start'));

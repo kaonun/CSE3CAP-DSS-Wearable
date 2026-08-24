@@ -9,6 +9,7 @@ export function useBleDevice(onReading?: BleReadingHandler) {
   const [heartRateHistory, setHeartRateHistory] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [connectionHistory, setConnectionHistory] = useState<ConnectionHistoryEntry[]>([]);
+  const [connectingDeviceId, setConnectingDeviceId] = useState<string | null>(null);
   const callbackRef = useRef(onReading);
   const connectedIds = useRef(new Set<string>());
   callbackRef.current = onReading;
@@ -26,7 +27,7 @@ export function useBleDevice(onReading?: BleReadingHandler) {
   };
 
   const connect = async (deviceId: string) => {
-    setStatus('connecting'); setError(null);
+    setStatus('connecting'); setError(null); setConnectingDeviceId(deviceId);
     try {
       await connectBleDevice(deviceId, (reading: SensorReading) => {
         if (reading.metric === 'heartRate') {
@@ -47,13 +48,16 @@ export function useBleDevice(onReading?: BleReadingHandler) {
       setConnectionHistory(current => [
         {
           id: deviceId,
-          name: devices.find(device => device.id === deviceId)?.name || 'Wearable',
+          // Null when the peripheral never advertised a name; the UI supplies
+          // a translated placeholder rather than baking English in here.
+          name: devices.find(device => device.id === deviceId)?.name ?? null,
           connectedAt: Date.now(),
         },
         ...current.filter(entry => entry.id !== deviceId),
       ].slice(0, 5));
       setStatus('connected');
     } catch (connectError) { setStatus('error'); setError(connectError instanceof Error ? connectError.message : 'BLE connection failed'); }
+    finally { setConnectingDeviceId(null); }
   };
 
   const disconnect = (deviceId?: string) => {
@@ -69,6 +73,7 @@ export function useBleDevice(onReading?: BleReadingHandler) {
   return {
     status,
     devices,
+    connectingDeviceId,
     connectedDeviceIds: Array.from(connectedIds.current),
     connectionHistory,
     heartRate,
