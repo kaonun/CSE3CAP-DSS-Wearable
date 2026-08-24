@@ -82,6 +82,17 @@ export function useBleDevice(onReading?: BleReadingHandler) {
         setConnectedDevices(current => current.filter(device => device.id !== deviceId));
         setError(connectError.message);
         setStatus(connectedIds.current.size ? 'connected' : 'error');
+      }, resolvedName => {
+        // A name read over GATT after connecting, for peripherals that do not
+        // advertise one. Update both the live card and the history entry.
+        setConnectedDevices(current =>
+          current.map(device =>
+            device.id === deviceId ? {...device, name: resolvedName} : device,
+          ),
+        );
+        setConnectionHistory(current =>
+          current.map(entry => (entry.id === deviceId ? {...entry, name: resolvedName} : entry)),
+        );
       });
 
       connectedIds.current.add(deviceId);

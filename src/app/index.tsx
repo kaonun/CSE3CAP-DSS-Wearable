@@ -8,7 +8,7 @@ import { ConnectSheet } from '@/components/connect-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/surface';
-import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useBleDevice, useNfc } from '@/connectivity';
 import { useReadingSync } from '@/data/use-reading-sync';
 import { useTheme } from '@/hooks/use-theme';
@@ -94,30 +94,17 @@ export default function WearableScreen() {
                 {t.metrics}
               </ThemedText>
             </View>
-            <View style={styles.headerActions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t.history}
-                hitSlop={10}
-                onPress={() => router.push('/history')}
-                style={({ pressed }) => [
-                  styles.headerButton,
-                  { backgroundColor: theme.fill, opacity: pressed ? 0.6 : 1 },
-                ]}>
-                <Ionicons name="stats-chart-outline" size={19} color={theme.tint} />
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t.settings}
-                hitSlop={10}
-                onPress={() => router.push('/settings')}
-                style={({ pressed }) => [
-                  styles.headerButton,
-                  { backgroundColor: theme.fill, opacity: pressed ? 0.6 : 1 },
-                ]}>
-                <Ionicons name="settings-outline" size={20} color={theme.tint} />
-              </Pressable>
-            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t.settings}
+              hitSlop={12}
+              onPress={() => router.push('/settings')}
+              style={({ pressed }) => [
+                styles.headerButton,
+                { backgroundColor: theme.fill, opacity: pressed ? 0.6 : 1 },
+              ]}>
+              <Ionicons name="settings-outline" size={20} color={theme.tint} />
+            </Pressable>
           </View>
 
           {/* One live card per connected device. */}
@@ -142,7 +129,7 @@ export default function WearableScreen() {
                       disabled={isBusy}
                       onPress={() => ble.disconnect(device.id)}
                       style={({ pressed }) => [styles.cardAction, { opacity: pressed ? 0.5 : 1 }]}>
-                      <Ionicons name="close-circle" size={22} color={theme.textTertiary} />
+                      <Ionicons name="close-circle" size={22} color={theme.danger} />
                     </Pressable>
                   </View>
                 </View>
@@ -264,6 +251,26 @@ export default function WearableScreen() {
         </ScrollView>
       </SafeAreaView>
 
+      {/* Floating history entry point, anchored bottom-centre and clear of the
+          system navigation bar. */}
+      <SafeAreaView style={styles.floatingLayer} edges={['bottom']} pointerEvents="box-none">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t.history}
+          onPress={() => router.push('/history')}
+          style={({ pressed }) => [
+            styles.historyButton,
+            Shadow.floating,
+            { backgroundColor: theme.backgroundElement, borderColor: theme.separator },
+            pressed && { opacity: 0.75 },
+          ]}>
+          <Ionicons name="stats-chart" size={17} color={theme.tint} />
+          <ThemedText type="footnote" style={{ color: theme.tint }}>
+            {t.history}
+          </ThemedText>
+        </Pressable>
+      </SafeAreaView>
+
       <ConnectSheet
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
@@ -286,7 +293,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: {
     paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.six,
+    // Extra room so the floating history button never covers the last card.
+    paddingBottom: Spacing.six + Spacing.five,
     gap: Spacing.three,
     width: '100%',
     maxWidth: MaxContentWidth,
@@ -300,7 +308,23 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   headerText: { flex: 1, gap: Spacing.half },
-  headerActions: { flexDirection: 'row', gap: Spacing.two },
+  floatingLayer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    paddingBottom: Spacing.three,
+  },
+  historyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two + 2,
+    paddingHorizontal: Spacing.four,
+    borderRadius: Radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   headerButton: {
     width: 38,
     height: 38,

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -87,6 +87,11 @@ export function ConnectSheet({
   };
 
   const openNfc = () => {
+    // Clear any tag left over from a previous read first. Without this the
+    // auto-connect effect below fires the instant this view opens, so the
+    // "hold your tag near the phone" state is never seen.
+    handledTag.current = null;
+    nfc.reset();
     setMethod('nfc');
     nfc.readTag();
   };
@@ -187,20 +192,13 @@ export function ConnectSheet({
 
             {method === 'nfc' ? (
               <View style={styles.centered}>
-                <View style={[styles.nfcHalo, { backgroundColor: theme.fill }]}>
-                  <Ionicons
-                    name="radio"
-                    size={44}
-                    color={nfc.error ? theme.danger : theme.tint}
-                  />
-                </View>
+                <NfcHalo active={nfc.reading} failed={!!nfc.error} />
                 <ThemedText type="title3">
                   {nfc.reading ? t.waitingForTag : nfc.error ? t.readFailed : t.readNfcTag}
                 </ThemedText>
                 <ThemedText type="subhead" themeColor="textSecondary" style={styles.prompt}>
                   {nfc.error ?? t.tapTagHelp}
                 </ThemedText>
-                {nfc.reading ? <ActivityIndicator color={theme.tint} /> : null}
                 <Button
                   label={nfc.reading ? t.cancelNfcSearch : t.readNfcTag}
                   variant={nfc.reading ? 'destructive' : 'filled'}
@@ -212,6 +210,52 @@ export function ConnectSheet({
         </SafeAreaView>
       </View>
     </Modal>
+  );
+}
+
+/**
+ * Android shows no system UI while waiting for a tag, so the app has to make
+ * the waiting state obvious itself. The pulse signals "still scanning" rather
+ * than leaving a static icon that looks indistinguishable from a frozen screen.
+ */
+function NfcHalo({ active, failed }: { active: boolean; failed: boolean }) {
+  const theme = useTheme();
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!active) {
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, pulse]);
+
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] });
+  const color = failed ? theme.danger : theme.tint;
+
+  return (
+    <View style={styles.haloWrap}>
+      {active ? (
+        <Animated.View
+          style={[
+            styles.nfcHalo,
+            styles.haloRing,
+            { backgroundColor: color, opacity, transform: [{ scale }] },
+          ]}
+        />
+      ) : null}
+      <View style={[styles.nfcHalo, { backgroundColor: theme.fill }]}>
+        <Ionicons name="radio" size={44} color={color} />
+      </View>
+    </View>
   );
 }
 
@@ -280,11 +324,29 @@ function DeviceRow({
       style={({ pressed }) => [pressed && { backgroundColor: theme.backgroundSelected }]}>
       <View style={styles.deviceRow}>
         <View style={styles.flex}>
-          <ThemedText type="body" numberOfLines={1}>
-            {device.name ?? t.unnamedDevice}
-          </ThemedText>
-          <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
-            {device.advertisesHeartRate ? t.heartRateSensor : device.id}
+          <View style={styles.deviceTitleRow}>
+            <ThemedText
+              type="body"
+              numberOfLines={1}
+              themeColor={device.name ? 'text' : 'textSecondary'}
+              style={styles.flexShrink}>
+              {device.name ?? t.unnamedDevice}
+            </ThemedText>
+            {device.advertisesHeartRate ? (
+              <View style={[styles.badge, { backgroundColor: `${theme.live}22` }]}>
+                <Ionicons name="heart" size={10} color={theme.live} />
+                <ThemedText type="caption" style={{ color: theme.live }}>
+                  {t.heartRateSensor}
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
+
+          {/* The address is always shown — for peripherals that advertise no
+              name it is the only way to tell them apart. */}
+          <ThemedText type="caption" themeColor="textTertiary" numberOfLines={1} selectable>
+            {device.id}
+            {device.rssi !== null ? `  ·  ${device.rssi} dBm` : ''}
           </ThemedText>
         </View>
 
@@ -345,9 +407,21 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two + 4,
     minHeight: 56,
   },
+  flexShrink: { flexShrink: 1 },
+  deviceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: Spacing.one + 2,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+  },
   signal: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   signalBar: { width: 3, borderRadius: 1.5 },
   centered: { alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.five },
+  haloWrap: { width: 88, height: 88, alignItems: 'center', justifyContent: 'center' },
+  haloRing: { position: 'absolute' },
   nfcHalo: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
   notice: {
     padding: Spacing.three,
