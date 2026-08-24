@@ -4,28 +4,26 @@
     "slug": "DSS-wearable",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/dss-wearable-logo.png",
     "scheme": "dsswearable",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/dss-wearable-logo.png",
       "bundleIdentifier": "com.fusionfive.dsswearable",
       "supportsTablet": false
     },
     "android": {
       "package": "com.fusionfive.dsswearable",
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "BLUETOOTH_SCAN",
         "BLUETOOTH_CONNECT",
         "ACCESS_FINE_LOCATION",
-        "NFC"
+        "NFC",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.NFC"
       ]
     },
     "web": {
@@ -40,14 +38,21 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "image": "./assets/images/dss-wearable-logo.png",
+          "imageWidth": 135
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cffeb95c-b961-470a-9243-af28cfb1b30f"
+      }
     }
   }
 }

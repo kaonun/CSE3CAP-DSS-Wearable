@@ -22,12 +22,17 @@ type NfcModule = {
 };
 
 let nativeNfcStarted = false;
+let activeNfc: NfcModule['default'] | undefined;
 
 function validateTagId(value: unknown): string {
-  if (typeof value !== 'string' || !/^[A-Za-z0-9:_-]{1,128}$/.test(value)) {
+  const normalized = typeof value === 'string' ? value.replace(/[\u0000\u0001]/g, '').trim() : '';
+  const compactMac = normalized.replace(/[-\s]/g, ':').replace(/:{2,}/g, ':');
+  const isBluetoothAddress = /^([A-Fa-f0-9]{2}:){5}[A-Fa-f0-9]{2}$/.test(compactMac);
+  const isDeviceIdentifier = /^[A-Za-z0-9_-]{1,128}$/.test(normalized);
+  if (!isBluetoothAddress && !isDeviceIdentifier) {
     throw new Error('NFC tag does not contain a valid device identifier');
   }
-  return value;
+  return isBluetoothAddress ? compactMac.toUpperCase() : normalized;
 }
 
 function asBytes(payload: unknown): Uint8Array {
@@ -46,6 +51,11 @@ function asBytes(payload: unknown): Uint8Array {
 }
 
 function decodeNdefDeviceId(payload: unknown): string {
+  if (typeof payload === 'string' && /^([A-Fa-f0-9]{2}:){5}[A-Fa-f0-9]{2}$/.test(payload.trim())) {
+    return validateTagId(payload);
+  }
+
+  try {
   const bytes = asBytes(payload);
   if (bytes.length < 2) throw new Error('Truncated NDEF text payload');
 
@@ -55,9 +65,9 @@ function decodeNdefDeviceId(payload: unknown): string {
   if (textStart >= bytes.length) throw new Error('NFC text payload is empty');
   if ((status & 0x80) !== 0) throw new Error('NFC tag uses unsupported UTF-16 text encoding');
 
-  try {
     return validateTagId(new TextDecoder('utf-8', {fatal: true}).decode(bytes.slice(textStart)));
   } catch (error: unknown) {
+    if (typeof payload === 'string') return validateTagId(payload);
     if (error instanceof Error && error.message.startsWith('NFC tag')) throw error;
     throw new Error('NFC tag text is not valid UTF-8');
   }
@@ -80,6 +90,7 @@ export async function readNfcTag(): Promise<string> {
   // Native NFC is loaded only at point of use, preserving Expo Go mock mode.
   const NfcManagerModule = require('react-native-nfc-manager') as NfcModule;
   const nfc = NfcManagerModule.default;
+  activeNfc = nfc;
   if (!(await nfc.isSupported())) throw new Error('NFC is not supported on this device');
   if (!nativeNfcStarted) {
     await nfc.start();
@@ -91,9 +102,17 @@ export async function readNfcTag(): Promise<string> {
       alertMessage: 'Hold the DSS wearable NFC tag near this phone',
     });
     const tag = await nfc.getTag();
-    const record = tag?.ndefMessage?.find(item => isTextRecord(item, NfcManagerModule.Ndef));
+    const records = tag?.ndefMessage ?? [];
+    const record = records.find(item => isTextRecord(item, NfcManagerModule.Ndef))
+      ?? records.find(item => item.payload !== undefined);
     return decodeNdefDeviceId(record?.payload);
   } finally {
     await nfc.cancelTechnologyRequest().catch(() => undefined);
+    activeNfc = undefined;
   }
+}
+
+export async function cancelNfcRead(): Promise<void> {
+  await activeNfc?.cancelTechnologyRequest().catch(() => undefined);
+  activeNfc = undefined;
 }

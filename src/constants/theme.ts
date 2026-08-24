@@ -10,8 +10,8 @@ import { Platform } from 'react-native';
 export const Colors = {
   light: {
     text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
+    background: '#F4F7F8',
+    backgroundElement: '#FFFFFF',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
   },
@@ -61,5 +61,5 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+export const BottomTabInset = Platform.select({ ios: 8, android: 8 }) ?? 0;
 export const MaxContentWidth = 800;

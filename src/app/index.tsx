@@ -7,15 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useBleDevice, useNfc } from '@/connectivity';
 import { useTheme } from '@/hooks/use-theme';
-
-const STATUS_COPY: Record<string, string> = {
-  idle: 'Ready',
-  scanning: 'Searching nearby',
-  connecting: 'Connecting',
-  connected: 'Active',
-  disconnecting: 'Disconnecting',
-  error: 'Connection error',
-};
+import { useI18n } from '@/i18n';
 
 function formatClock(timestamp: number) {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -66,6 +58,15 @@ function PrimaryButton({
 
 export default function WearableScreen() {
   const theme = useTheme();
+  const { t } = useI18n();
+  const statusCopy: Record<string, string> = {
+    idle: t.ready,
+    scanning: t.searching,
+    connecting: t.connecting,
+    connected: t.active,
+    disconnecting: t.connecting,
+    error: t.connectionError,
+  };
   const ble = useBleDevice();
   const nfc = useNfc();
 
@@ -73,10 +74,10 @@ export default function WearableScreen() {
   const isBusy = ble.status === 'scanning' || ble.status === 'connecting' || ble.status === 'disconnecting';
 
   const primaryLabel = useMemo(() => {
-    if (ble.status === 'scanning') return 'Searching...';
-    if (ble.status === 'connecting') return 'Connecting...';
-    if (isConnected) return 'Disconnect';
-    return 'Scan for wearables';
+    if (ble.status === 'scanning') return `${t.searching}...`;
+    if (ble.status === 'connecting') return `${t.connecting}...`;
+    if (isConnected) return t.disconnect;
+    return t.scanForWearables;
   }, [ble.status, isConnected]);
 
   const onPrimaryPress = () => {
@@ -116,7 +117,7 @@ export default function WearableScreen() {
               <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
                 CONNECTION
               </ThemedText>
-              <ThemedText type="smallBold">{STATUS_COPY[ble.status] ?? ble.status}</ThemedText>
+              <ThemedText type="smallBold">{statusCopy[ble.status] ?? ble.status}</ThemedText>
             </View>
             <View style={styles.statusBarSignal}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
@@ -229,14 +230,14 @@ export default function WearableScreen() {
             )}
 
             <Pressable
-              onPress={nfc.tagId ? onNfcConnect : nfc.readTag}
-              disabled={nfc.reading}
+              onPress={nfc.reading ? nfc.cancel : nfc.tagId ? onNfcConnect : nfc.readTag}
+              disabled={false}
               style={({ pressed }) => [
                 styles.primaryButton,
-                { backgroundColor: '#3C87F7', opacity: nfc.reading ? 0.5 : pressed ? 0.85 : 1 },
+                { backgroundColor: nfc.reading ? '#E5484D' : '#3C87F7', opacity: pressed ? 0.85 : 1 },
               ]}>
               <ThemedText type="smallBold" style={styles.primaryButtonLabel}>
-                {nfc.tagId ? 'Connect tag device' : nfc.reading ? 'Waiting for tag...' : 'Read NFC tag'}
+                {nfc.reading ? 'Cancel NFC search' : nfc.tagId ? 'Connect tag device' : 'Read NFC tag'}
               </ThemedText>
             </Pressable>
           </ThemedView>
@@ -275,8 +276,8 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollContent: {
     paddingHorizontal: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.five,
-    gap: Spacing.four,
+    paddingBottom: BottomTabInset + Spacing.three,
+    gap: Spacing.three,
     alignSelf: 'center',
     width: '100%',
     maxWidth: MaxContentWidth,
@@ -299,7 +300,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: '#E5484D',
   },
-  card: { borderRadius: Spacing.four, padding: Spacing.four, gap: Spacing.two },
+  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   dot: { width: 8, height: 8, borderRadius: 4, marginTop: Spacing.one },
   bpmValue: { fontSize: 40, lineHeight: 44 },
