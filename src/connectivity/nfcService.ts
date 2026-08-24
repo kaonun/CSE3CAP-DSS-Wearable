@@ -18,8 +18,13 @@ type NfcModule = {
     cancelTechnologyRequest: () => Promise<void>;
   };
   NfcTech: {Ndef: unknown};
-  Ndef: {TNF_WELL_KNOWN: number; RTD_TEXT: number[] | string};
+  Ndef: {TNF_WELL_KNOWN: number; TNF_MIME_MEDIA: number; RTD_TEXT: number[] | string};
 };
+
+/** application/vnd.bluetooth.ep.oob — the NFC-Forum "Bluetooth Secure Simple
+ *  Pairing" handover record. Common NFC-writing apps (e.g. NFC Tools' "Bluetooth"
+ *  record type) use this instead of plain text to store a device address. */
+const BLUETOOTH_OOB_MIME = 'application/vnd.bluetooth.ep.oob';
 
 let nativeNfcStarted = false;
 let activeNfc: NfcModule['default'] | undefined;
@@ -30,7 +35,8 @@ function validateTagId(value: unknown): string {
   const isBluetoothAddress = /^([A-Fa-f0-9]{2}:){5}[A-Fa-f0-9]{2}$/.test(compactMac);
   const isDeviceIdentifier = /^[A-Za-z0-9_-]{1,128}$/.test(normalized);
   if (!isBluetoothAddress && !isDeviceIdentifier) {
-    throw new Error('NFC tag does not contain a valid device identifier');
+    const shown = normalized.length > 40 ? `${normalized.slice(0, 40)}…` : normalized;
+    throw new Error(`NFC tag does not contain a valid device identifier (read: "${shown}")`);
   }
   return isBluetoothAddress ? compactMac.toUpperCase() : normalized;
 }
@@ -84,6 +90,31 @@ function isTextRecord(record: NdefRecordLike, ndef: NfcModule['Ndef']): boolean 
     && record.type.every((value, index) => value === expectedBytes[index]);
 }
 
+function isBluetoothOobRecord(record: NdefRecordLike, ndef: NfcModule['Ndef']): boolean {
+  if (record.tnf !== ndef.TNF_MIME_MEDIA) return false;
+  if (record.type === BLUETOOTH_OOB_MIME) return true;
+  if (!Array.isArray(record.type)) return false;
+  const expectedBytes = Array.from(BLUETOOTH_OOB_MIME, character => character.charCodeAt(0));
+  return record.type.length === expectedBytes.length
+    && record.type.every((value, index) => value === expectedBytes[index]);
+}
+
+/**
+ * Parses the "Bluetooth Secure Simple Pairing Using NFC" OOB payload:
+ * 2-byte little-endian length, then the 6-byte device address stored
+ * in reverse (least-significant byte first), then optional EIR data
+ * we don't need. See NFC Forum AD-BTSSP-1.3.
+ */
+function decodeBluetoothOobAddress(payload: unknown): string {
+  const bytes = asBytes(payload);
+  if (bytes.length < 8) throw new Error('Bluetooth pairing record on this tag is truncated');
+  const address = Array.from(bytes.slice(2, 8))
+    .reverse()
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join(':');
+  return validateTagId(address);
+}
+
 export async function readNfcTag(): Promise<string> {
   if (isMockMode) return mockNfcRead();
 
@@ -103,9 +134,15 @@ export async function readNfcTag(): Promise<string> {
     });
     const tag = await nfc.getTag();
     const records = tag?.ndefMessage ?? [];
-    const record = records.find(item => isTextRecord(item, NfcManagerModule.Ndef))
-      ?? records.find(item => item.payload !== undefined);
-    return decodeNdefDeviceId(record?.payload);
+
+    const textRecord = records.find(item => isTextRecord(item, NfcManagerModule.Ndef));
+    if (textRecord) return decodeNdefDeviceId(textRecord.payload);
+
+    const bluetoothRecord = records.find(item => isBluetoothOobRecord(item, NfcManagerModule.Ndef));
+    if (bluetoothRecord) return decodeBluetoothOobAddress(bluetoothRecord.payload);
+
+    const fallback = records.find(item => item.payload !== undefined);
+    return decodeNdefDeviceId(fallback?.payload);
   } finally {
     await nfc.cancelTechnologyRequest().catch(() => undefined);
     activeNfc = undefined;
