@@ -3,6 +3,7 @@ import { getAuth, initializeAuth, type Auth } from 'firebase/auth';
 // @ts-expect-error - getReactNativePersistence exists in firebase/auth's React Native
 // build at runtime but is missing from its published web-oriented .d.ts (firebase/firebase-js-sdk#9316).
 import { getReactNativePersistence } from 'firebase/auth';
+import { getFirestore, initializeFirestore, type Firestore } from 'firebase/firestore';
 import * as SecureStore from 'expo-secure-store';
 
 const config = {
@@ -34,6 +35,8 @@ const secureStorePersistence = {
 };
 
 let auth: Auth | null = null;
+let db: Firestore | null = null;
+
 if (firebaseConfigured) {
   const app = getApps().length ? getApp() : initializeApp(config);
   try {
@@ -43,6 +46,16 @@ if (firebaseConfigured) {
     // e.g. during Fast Refresh — fall back to the existing instance.
     auth = getAuth(app);
   }
+
+  try {
+    // React Native lacks full support for the streaming transport Firestore
+    // prefers, which makes writes hang or error out. Long polling is the
+    // supported transport here.
+    db = initializeFirestore(app, { experimentalForceLongPolling: true });
+  } catch {
+    // Same re-entry case as above.
+    db = getFirestore(app);
+  }
 }
 
-export { auth };
+export { auth, db };

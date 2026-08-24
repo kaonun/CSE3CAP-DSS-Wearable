@@ -88,6 +88,16 @@ export type Messages = {
   signInPrompt: string;
   about: string;
   version: string;
+  data: string;
+  exportData: string;
+  exportDataHelp: string;
+  exporting: string;
+  exportEmpty: string;
+  exportDone: string;
+  deleteData: string;
+  deleteDataConfirm: string;
+  deleteDataDone: string;
+  delete: string;
 };
 
 export type Language =

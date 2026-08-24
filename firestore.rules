@@ -1,0 +1,55 @@
+rules_version = '2';
+
+// DSS Wearable — Firestore security rules.
+//
+// Every document lives under users/{uid}, and access is restricted to that
+// user. Writes are re-validated here rather than trusting the client, per the
+// project's security requirements ("Validate all input from wearables and user
+// forms server-side, not just client-side").
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Mirrors the client-side bounds in src/connectivity/heartRate.ts so a
+    // compromised or modified client cannot store implausible readings.
+    function isValidHeartRate(value) {
+      return value is int && value > 0 && value <= 300;
+    }
+
+    function isValidSummary(data) {
+      return data.keys().hasAll(['deviceId', 'metric', 'bucketStart', 'min', 'max', 'avg', 'count'])
+        && data.keys().hasOnly(['deviceId', 'deviceName', 'metric', 'bucketStart', 'min', 'max', 'avg', 'count', 'createdAt'])
+        && data.metric == 'heartRate'
+        && data.deviceId is string
+        && data.deviceId.size() > 0
+        && data.deviceId.size() <= 128
+        && (!('deviceName' in data.keys()) || data.deviceName == null || data.deviceName is string)
+        && data.bucketStart is timestamp
+        && isValidHeartRate(data.min)
+        && isValidHeartRate(data.max)
+        && isValidHeartRate(data.avg)
+        && data.min <= data.avg
+        && data.avg <= data.max
+        && data.count is int
+        && data.count > 0;
+    }
+
+    // One document per device per one-minute bucket. Raw per-second readings
+    // are deliberately not stored (data minimisation).
+    match /users/{userId}/summaries/{summaryId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidSummary(request.resource.data);
+      // Users must be able to erase their own history, since account deletion
+      // has to remove stored readings.
+      allow delete: if isOwner(userId);
+    }
+
+    // Anything not explicitly matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

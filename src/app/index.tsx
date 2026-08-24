@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/surface';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useBleDevice, useNfc } from '@/connectivity';
+import { useReadingSync } from '@/data/use-reading-sync';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n } from '@/i18n';
 
@@ -55,9 +56,19 @@ export default function WearableScreen() {
   const theme = useTheme();
   const { t } = useI18n();
   const router = useRouter();
-  const ble = useBleDevice();
+  const sync = useReadingSync();
+  // Readings flow straight into the aggregator, which batches them into
+  // one-minute summaries before they reach Firestore.
+  const ble = useBleDevice(sync.record);
   const nfc = useNfc();
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  // Keep the aggregator's device-name lookup current so stored summaries carry
+  // a readable name alongside the id.
+  const { setDeviceName } = sync;
+  useEffect(() => {
+    ble.connectedDevices.forEach(device => setDeviceName(device.id, device.name));
+  }, [ble.connectedDevices, setDeviceName]);
 
   const connectedCount = ble.connectedDevices.length;
   const isConnected = connectedCount > 0;

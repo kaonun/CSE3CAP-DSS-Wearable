@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LanguagePicker } from '@/components/language-picker';
@@ -10,6 +10,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ListRow } from '@/components/ui/list-row';
 import { Section } from '@/components/ui/surface';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { exportSummariesToCsv } from '@/data/export';
+import { deleteAllSummaries } from '@/data/summaries';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n } from '@/i18n';
 import { useAuth } from '@/auth';
@@ -20,9 +22,51 @@ export default function SettingsScreen() {
   const { language, languages, t } = useI18n();
   const { user, configured, logOut } = useAuth();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [busy, setBusy] = useState<'export' | 'delete' | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const current = languages.find(item => item.code === language);
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+
+  const runExport = async () => {
+    setBusy('export');
+    setNotice(null);
+    try {
+      const result = await exportSummariesToCsv();
+      setNotice(
+        result.status === 'empty'
+          ? t.exportEmpty
+          : t.exportDone.replace('{count}', String(result.rows)),
+      );
+    } catch (exportError) {
+      setNotice(exportError instanceof Error ? exportError.message : t.errGeneric);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Erasing stored readings is irreversible, so it goes through a confirmation.
+  const confirmDelete = () => {
+    Alert.alert(t.deleteData, t.deleteDataConfirm, [
+      { text: t.cancel, style: 'cancel' },
+      {
+        text: t.delete,
+        style: 'destructive',
+        onPress: async () => {
+          setBusy('delete');
+          setNotice(null);
+          try {
+            const removed = await deleteAllSummaries();
+            setNotice(t.deleteDataDone.replace('{count}', String(removed)));
+          } catch (deleteError) {
+            setNotice(deleteError instanceof Error ? deleteError.message : t.errGeneric);
+          } finally {
+            setBusy(null);
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -78,6 +122,35 @@ export default function SettingsScreen() {
             ) : null}
           </Section>
 
+          {configured && user ? (
+            <Section header={t.data} footer={t.exportDataHelp}>
+              <ListRow
+                title={busy === 'export' ? t.exporting : t.exportData}
+                icon="download-outline"
+                iconBackground={theme.tint}
+                chevron={false}
+                onPress={busy ? undefined : runExport}
+              />
+              <ListRow
+                title={t.deleteData}
+                icon="trash-outline"
+                iconBackground={theme.danger}
+                destructive
+                chevron={false}
+                onPress={busy ? undefined : confirmDelete}
+                separator={false}
+              />
+            </Section>
+          ) : null}
+
+          {notice ? (
+            <View style={[styles.notice, { backgroundColor: theme.fill }]}>
+              <ThemedText type="footnote" themeColor="textSecondary">
+                {notice}
+              </ThemedText>
+            </View>
+          ) : null}
+
           <Section header={t.about}>
             <ListRow title={t.version} value={appVersion} chevron={false} separator={false} />
           </Section>
@@ -110,4 +183,5 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
   },
   header: { gap: Spacing.half },
+  notice: { padding: Spacing.three, borderRadius: Radius.md },
 });
