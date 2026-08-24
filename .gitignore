@@ -30,8 +30,15 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# local env files — never commit real credentials (.env.example is the template)
+.env
+.env.*
+!.env.example
+
+# build artifacts
+*.apk
+*.aab
+src.zip
 
 # typescript
 *.tsbuildinfo

@@ -1,36 +1,59 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { ActivityIndicator, useColorScheme, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
-import { I18nProvider } from '@/i18n';
-import { AuthProvider, useAuth } from '@/auth';
+import { Colors } from '@/constants/theme';
+import { I18nProvider, useI18n } from '@/i18n';
+import { ActivityTracker, AuthProvider, useAuth } from '@/auth';
 import LoginScreen from './login';
 
 SplashScreen.preventAutoHideAsync();
 
-export default function TabLayout() {
+export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AuthProvider>
-        <I18nProvider>
-          <AuthGate />
-        </I18nProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <AuthProvider>
+          <I18nProvider>
+            <AuthGate />
+          </I18nProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
 function AuthGate() {
-  const { configured, loading, user } = useAuth();
-  if (configured && loading) return null;
+  const colorScheme = useColorScheme();
+  const theme = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
+  const { configured, loading: authLoading, user } = useAuth();
+  const { loading: languageLoading } = useI18n();
+
+  // Hold the splash until both the session and the language preference resolve,
+  // so the app never flashes English or the login screen at an already-signed-in
+  // user.
+  if ((configured && authLoading) || languageLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
+        <ActivityIndicator color={theme.tint} />
+      </View>
+    );
+  }
+
   if (configured && !user) return <LoginScreen />;
+
   return (
-    <>
+    <ActivityTracker>
       <AnimatedSplashOverlay />
       <AppTabs />
-    </>
+    </ActivityTracker>
   );
 }

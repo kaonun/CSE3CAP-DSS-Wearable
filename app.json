@@ -15,6 +15,10 @@
     "android": {
       "package": "com.fusionfive.dsswearable",
       "predictiveBackGestureEnabled": false,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/dss-wearable-logo.png",
+        "backgroundColor": "#FFFFFF"
+      },
       "permissions": [
         "BLUETOOTH_SCAN",
         "BLUETOOTH_CONNECT",
@@ -37,12 +41,19 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/images/dss-wearable-logo.png",
-          "imageWidth": 135
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#000000",
+            "image": "./assets/images/dss-wearable-logo.png",
+            "imageWidth": 160
+          }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

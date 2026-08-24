@@ -1,10 +1,12 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/surface';
+import { BottomTabInset, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useBleDevice, useNfc } from '@/connectivity';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n } from '@/i18n';
@@ -13,7 +15,19 @@ function formatClock(timestamp: number) {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function Sparkline({ values }: { values: number[] }) {
+/** Small coloured status chip, mirroring the iOS "capsule" affordance. */
+function StatusPill({ label, color }: { label: string; color: string }) {
+  return (
+    <View style={[styles.pill, { backgroundColor: `${color}1F` }]}>
+      <View style={[styles.pillDot, { backgroundColor: color }]} />
+      <ThemedText type="caption" style={{ color }}>
+        {label}
+      </ThemedText>
+    </View>
+  );
+}
+
+function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length === 0) return null;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -22,43 +36,30 @@ function Sparkline({ values }: { values: number[] }) {
     <View style={styles.sparkline}>
       {values.map((value, index) => {
         const ratio = (value - min) / range;
-        const height = 4 + ratio * 20;
-        return <View key={index} style={[styles.sparkBar, { height, opacity: 0.35 + ratio * 0.65 }]} />;
+        return (
+          <View
+            key={index}
+            style={[
+              styles.sparkBar,
+              { height: 6 + ratio * 30, backgroundColor: color, opacity: 0.3 + ratio * 0.7 },
+            ]}
+          />
+        );
       })}
     </View>
-  );
-}
-
-function PrimaryButton({
-  label,
-  onPress,
-  disabled,
-  variant,
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  variant: 'scan' | 'disconnect';
-}) {
-  const backgroundColor = variant === 'disconnect' ? '#E5484D' : '#3C87F7';
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.primaryButton,
-        { backgroundColor, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
-      ]}>
-      <ThemedText type="smallBold" style={styles.primaryButtonLabel}>
-        {label}
-      </ThemedText>
-    </Pressable>
   );
 }
 
 export default function WearableScreen() {
   const theme = useTheme();
   const { t } = useI18n();
+  const ble = useBleDevice();
+  const nfc = useNfc();
+
+  const isConnected = ble.connectedDeviceIds.length > 0;
+  const isBusy =
+    ble.status === 'scanning' || ble.status === 'connecting' || ble.status === 'disconnecting';
+
   const statusCopy: Record<string, string> = {
     idle: t.ready,
     scanning: t.searching,
@@ -67,268 +68,284 @@ export default function WearableScreen() {
     disconnecting: t.connecting,
     error: t.connectionError,
   };
-  const ble = useBleDevice();
-  const nfc = useNfc();
 
-  const isConnected = ble.connectedDeviceIds.length > 0;
-  const isBusy = ble.status === 'scanning' || ble.status === 'connecting' || ble.status === 'disconnecting';
+  const statusColor =
+    ble.status === 'error' ? theme.danger : isConnected ? theme.live : theme.textSecondary;
 
   const primaryLabel = useMemo(() => {
     if (ble.status === 'scanning') return `${t.searching}...`;
     if (ble.status === 'connecting') return `${t.connecting}...`;
-    if (isConnected) return t.disconnect;
-    return t.scanForWearables;
-  }, [ble.status, isConnected]);
-
-  const onPrimaryPress = () => {
-    if (isConnected) {
-      ble.disconnect();
-    } else {
-      ble.scan();
-    }
-  };
-
-  const onNfcConnect = () => {
-    if (nfc.tagId) ble.connect(nfc.tagId);
-  };
+    return isConnected ? t.disconnect : t.scanForWearables;
+  }, [ble.status, isConnected, t]);
 
   const nfcStatusLabel = nfc.error
-    ? 'Read failed'
+    ? t.readFailed
     : nfc.reading
-      ? 'Waiting for tag'
+      ? t.waitingForTag
       : nfc.tagId
-        ? 'Tag ready'
-        : 'Not scanned';
+        ? t.tagReady
+        : t.notScanned;
 
   return (
-    <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <View style={[styles.screen, { backgroundColor: theme.background }]}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.eyebrow}>
-              FUSION FIVE
+            <ThemedText type="largeTitle">{t.wearable}</ThemedText>
+            <ThemedText type="subhead" themeColor="textSecondary">
+              {t.homeSubtitle}
             </ThemedText>
-            <ThemedText type="subtitle">Wearable</ThemedText>
-            <ThemedText themeColor="textSecondary">A quiet view of your live connection.</ThemedText>
           </View>
 
-          <ThemedView type="backgroundSelected" style={styles.statusBar}>
-            <View>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
-                CONNECTION
-              </ThemedText>
-              <ThemedText type="smallBold">{statusCopy[ble.status] ?? ble.status}</ThemedText>
-            </View>
-            <View style={styles.statusBarSignal}>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
-                SIGNAL
-              </ThemedText>
-              <ThemedText type="smallBold">{ble.heartRate ? `${ble.heartRate} bpm` : '--'}</ThemedText>
-            </View>
-          </ThemedView>
-
-          {ble.error ? (
-            <ThemedView type="backgroundElement" style={styles.errorBanner}>
-              <ThemedText type="small" themeColor="text">
-                {ble.error}
-              </ThemedText>
-            </ThemedView>
-          ) : null}
-
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <View>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
-                  BLUETOOTH
+          {/* Live reading hero */}
+          <Card style={styles.hero}>
+            <View style={styles.heroTop}>
+              <View style={styles.heroLabels}>
+                <ThemedText type="footnote" themeColor="textSecondary" style={styles.label}>
+                  {t.connection}
                 </ThemedText>
-                <ThemedText type="smallBold">Nearby devices</ThemedText>
+                <ThemedText type="headline">{statusCopy[ble.status] ?? ble.status}</ThemedText>
               </View>
-              <View style={[styles.dot, { backgroundColor: isConnected ? '#30B855' : theme.textSecondary }]} />
+              <StatusPill
+                label={isConnected ? t.connected : t.notConnected}
+                color={statusColor}
+              />
             </View>
 
-            <ThemedText type="small" themeColor="textSecondary">
-              {isConnected ? 'Connected' : 'Not connected'}
-            </ThemedText>
+            <View style={styles.metricRow}>
+              <ThemedText type="metric" themeColor={ble.heartRate ? 'text' : 'textTertiary'}>
+                {ble.heartRate ?? '--'}
+              </ThemedText>
+              <ThemedText type="title3" themeColor="textSecondary" style={styles.unit}>
+                {t.bpm}
+              </ThemedText>
+            </View>
 
-            <ThemedText type="title" style={styles.bpmValue}>
-              {ble.heartRate ? `${ble.heartRate} bpm` : '-- bpm'}
-            </ThemedText>
             {ble.heartRateHistory.length > 1 ? (
-              <Sparkline values={ble.heartRateHistory} />
+              <Sparkline values={ble.heartRateHistory} color={theme.tint} />
             ) : (
-              <ThemedText type="small" themeColor="textSecondary">
-                No live reading yet
+              <ThemedText type="footnote" themeColor="textTertiary">
+                {t.noLiveReading}
               </ThemedText>
             )}
 
-            <PrimaryButton
+            <Button
               label={primaryLabel}
-              onPress={onPrimaryPress}
+              onPress={isConnected ? () => ble.disconnect() : () => ble.scan()}
               disabled={isBusy}
-              variant={isConnected ? 'disconnect' : 'scan'}
+              loading={isBusy}
+              variant={isConnected ? 'destructive' : 'filled'}
+              icon={isConnected ? undefined : 'bluetooth'}
             />
+          </Card>
 
-            {ble.devices.length > 0 ? (
-              <View style={styles.deviceList}>
-                {ble.devices.map((device) => {
+          {ble.error ? (
+            <View style={[styles.errorBanner, { backgroundColor: theme.fill, borderLeftColor: theme.danger }]}>
+              <Ionicons name="warning" size={16} color={theme.danger} />
+              <ThemedText type="footnote" style={styles.flex}>
+                {ble.error}
+              </ThemedText>
+            </View>
+          ) : null}
+
+          {/* Discovered devices */}
+          {ble.devices.length > 0 ? (
+            <View style={styles.section}>
+              <ThemedText type="footnote" themeColor="textSecondary" style={styles.sectionHeader}>
+                {t.nearbyDevices.toUpperCase()}
+              </ThemedText>
+              <Card>
+                {ble.devices.map((device, index) => {
                   const connected = ble.connectedDeviceIds.includes(device.id);
                   return (
-                    <View key={device.id} style={styles.deviceRow}>
-                      <View style={styles.deviceInfo}>
-                        <ThemedText type="smallBold">{device.name}</ThemedText>
-                        <ThemedText type="small" themeColor="textSecondary" selectable>
-                          {device.id}
-                        </ThemedText>
+                    <View key={device.id}>
+                      <View style={styles.deviceRow}>
+                        <View style={[styles.deviceIcon, { backgroundColor: theme.fill }]}>
+                          <Ionicons name="watch-outline" size={18} color={theme.tint} />
+                        </View>
+                        <View style={styles.deviceInfo}>
+                          <ThemedText type="body" numberOfLines={1}>
+                            {device.name}
+                          </ThemedText>
+                          <ThemedText type="caption" themeColor="textTertiary" numberOfLines={1} selectable>
+                            {device.id}
+                          </ThemedText>
+                        </View>
+                        {connected ? (
+                          <StatusPill label={t.connected} color={theme.live} />
+                        ) : (
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={() => ble.connect(device.id)}
+                            disabled={isBusy}
+                            style={({ pressed }) => [
+                              styles.connectChip,
+                              { backgroundColor: theme.fill, opacity: isBusy ? 0.4 : pressed ? 0.7 : 1 },
+                            ]}>
+                            <ThemedText type="footnote" style={{ color: theme.tint }}>
+                              {t.connect}
+                            </ThemedText>
+                          </Pressable>
+                        )}
                       </View>
-                      {connected ? (
-                        <ThemedText type="smallBold" style={styles.connectedLabel}>
-                          Connected
-                        </ThemedText>
-                      ) : (
-                        <Pressable
-                          onPress={() => ble.connect(device.id)}
-                          disabled={isBusy}
-                          style={({ pressed }) => [
-                            styles.connectChip,
-                            { backgroundColor: theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },
-                          ]}>
-                          <ThemedText type="smallBold">Connect</ThemedText>
-                        </Pressable>
-                      )}
+                      {index < ble.devices.length - 1 ? (
+                        <View style={[styles.separator, { backgroundColor: theme.separator }]} />
+                      ) : null}
                     </View>
                   );
                 })}
-              </View>
-            ) : null}
-          </ThemedView>
-
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <View>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
-                  NFC
-                </ThemedText>
-                <ThemedText type="smallBold">Quick connect</ThemedText>
-              </View>
-              <ThemedText type="small" style={styles.linkPrimary}>
-                NFC
-              </ThemedText>
+              </Card>
             </View>
+          ) : null}
 
-            <ThemedText type="small" themeColor="textSecondary" style={styles.upper}>
-              {nfcStatusLabel.toUpperCase()}
+          {/* NFC quick connect */}
+          <View style={styles.section}>
+            <ThemedText type="footnote" themeColor="textSecondary" style={styles.sectionHeader}>
+              {t.nfc.toUpperCase()}
             </ThemedText>
+            <Card style={styles.nfcCard}>
+              <View style={styles.nfcHeader}>
+                <View style={[styles.deviceIcon, { backgroundColor: theme.fill }]}>
+                  <Ionicons name="radio-outline" size={18} color={theme.tint} />
+                </View>
+                <View style={styles.flex}>
+                  <ThemedText type="body">{t.quickConnect}</ThemedText>
+                  <ThemedText type="footnote" themeColor="textSecondary">
+                    {nfcStatusLabel}
+                  </ThemedText>
+                </View>
+              </View>
 
-            {nfc.error ? (
-              <ThemedText type="small" themeColor="text">
-                {nfc.error}
+              <ThemedText type="footnote" themeColor="textTertiary">
+                {nfc.error ?? t.nfcHelp}
               </ThemedText>
-            ) : (
-              <ThemedText type="small" themeColor="textSecondary">
-                Use an NFC tag to identify a wearable.
-              </ThemedText>
-            )}
 
-            <Pressable
-              onPress={nfc.reading ? nfc.cancel : nfc.tagId ? onNfcConnect : nfc.readTag}
-              disabled={false}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                { backgroundColor: nfc.reading ? '#E5484D' : '#3C87F7', opacity: pressed ? 0.85 : 1 },
-              ]}>
-              <ThemedText type="smallBold" style={styles.primaryButtonLabel}>
-                {nfc.reading ? 'Cancel NFC search' : nfc.tagId ? 'Connect tag device' : 'Read NFC tag'}
-              </ThemedText>
-            </Pressable>
-          </ThemedView>
+              <Button
+                label={
+                  nfc.reading ? t.cancelNfcSearch : nfc.tagId ? t.connectTagDevice : t.readNfcTag
+                }
+                variant={nfc.reading ? 'destructive' : 'tinted'}
+                onPress={
+                  nfc.reading
+                    ? nfc.cancel
+                    : nfc.tagId
+                      ? () => ble.connect(nfc.tagId as string)
+                      : nfc.readTag
+                }
+              />
+            </Card>
+          </View>
 
+          {/* History */}
           {ble.connectionHistory.length > 0 ? (
-            <ThemedView type="backgroundElement" style={styles.card}>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
-                RECENT ACTIVITY
+            <View style={styles.section}>
+              <ThemedText type="footnote" themeColor="textSecondary" style={styles.sectionHeader}>
+                {t.recentActivity.toUpperCase()}
               </ThemedText>
-              <ThemedText type="smallBold">Connected devices</ThemedText>
-              <View style={styles.historyList}>
+              <Card>
                 {ble.connectionHistory.map((entry, index) => (
-                  <View key={`${entry.id}-${entry.connectedAt}-${index}`} style={styles.historyRow}>
-                    <View>
-                      <ThemedText type="smallBold">{entry.name}</ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Bluetooth wearable
+                  <View key={`${entry.id}-${entry.connectedAt}-${index}`}>
+                    <View style={styles.historyRow}>
+                      <View style={styles.flex}>
+                        <ThemedText type="body" numberOfLines={1}>
+                          {entry.name}
+                        </ThemedText>
+                        <ThemedText type="footnote" themeColor="textSecondary">
+                          {t.bluetoothWearable}
+                        </ThemedText>
+                      </View>
+                      <ThemedText type="footnote" themeColor="textTertiary">
+                        {formatClock(entry.connectedAt)}
                       </ThemedText>
                     </View>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {formatClock(entry.connectedAt)}
-                    </ThemedText>
+                    {index < ble.connectionHistory.length - 1 ? (
+                      <View style={[styles.separator, { backgroundColor: theme.separator }]} />
+                    ) : null}
                   </View>
                 ))}
-              </View>
-            </ThemedView>
+              </Card>
+            </View>
           ) : null}
         </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   safeArea: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.three,
-    gap: Spacing.three,
-    alignSelf: 'center',
+  flex: { flex: 1 },
+  content: {
+    paddingHorizontal: Spacing.three,
+    paddingBottom: BottomTabInset + Spacing.five,
+    gap: Spacing.four,
     width: '100%',
     maxWidth: MaxContentWidth,
+    alignSelf: 'center',
   },
-  header: { paddingTop: Spacing.four, gap: Spacing.one },
-  eyebrow: { letterSpacing: 1.5, textTransform: 'uppercase' },
-  statusBar: {
+  header: { paddingTop: Spacing.three, gap: Spacing.half },
+  label: { textTransform: 'uppercase', letterSpacing: 0.6 },
+
+  hero: { padding: Spacing.four, gap: Spacing.three },
+  heroTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  heroLabels: { gap: Spacing.half },
+  metricRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
+  unit: { marginBottom: Spacing.one },
+
+  pill: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.four,
+    alignItems: 'center',
+    gap: Spacing.one + 2,
+    paddingHorizontal: Spacing.two + 2,
+    paddingVertical: Spacing.one + 1,
+    borderRadius: Radius.full,
   },
-  statusBarSignal: { alignItems: 'flex-end' },
-  label: { textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.half },
+  pillDot: { width: 6, height: 6, borderRadius: 3 },
+
+  sparkline: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 36 },
+  sparkBar: { flex: 1, maxWidth: 6, borderRadius: 3 },
+
   errorBanner: {
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: Radius.md,
     borderLeftWidth: 3,
-    borderLeftColor: '#E5484D',
   },
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
-  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  dot: { width: 8, height: 8, borderRadius: 4, marginTop: Spacing.one },
-  bpmValue: { fontSize: 40, lineHeight: 44 },
-  sparkline: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 24, marginBottom: Spacing.one },
-  sparkBar: { width: 4, borderRadius: 2, backgroundColor: '#3C87F7' },
-  primaryButton: { borderRadius: Spacing.three, paddingVertical: Spacing.three, alignItems: 'center', marginTop: Spacing.two },
-  primaryButtonLabel: { color: '#FFFFFF' },
-  deviceList: { marginTop: Spacing.two, gap: Spacing.three },
+
+  section: { gap: Spacing.two },
+  sectionHeader: { marginLeft: Spacing.three, letterSpacing: 0.6 },
+
   deviceRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: Spacing.two,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.25)',
+    gap: Spacing.three,
+    padding: Spacing.three,
   },
-  deviceInfo: { flexShrink: 1, paddingRight: Spacing.two },
-  connectChip: { borderRadius: Spacing.five, paddingVertical: Spacing.one, paddingHorizontal: Spacing.three },
-  connectedLabel: { color: '#30B855' },
-  linkPrimary: { color: '#3C87F7' },
-  upper: { textTransform: 'uppercase', letterSpacing: 1 },
-  historyList: { marginTop: Spacing.one, gap: Spacing.two },
+  deviceIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deviceInfo: { flex: 1, gap: 1 },
+  connectChip: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one + 2,
+    borderRadius: Radius.full,
+  },
+
+  nfcCard: { padding: Spacing.three, gap: Spacing.three },
+  nfcHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+
   historyRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: Spacing.two,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.25)',
+    gap: Spacing.three,
+    padding: Spacing.three,
   },
+  separator: { height: StyleSheet.hairlineWidth, marginLeft: Spacing.three },
 });

@@ -1,39 +1,47 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Image, useColorScheme } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { useI18n } from '@/i18n';
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const theme = useTheme();
+  const { t } = useI18n();
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.text,
-        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarActiveTintColor: theme.tint,
+        tabBarInactiveTintColor: theme.textTertiary,
         tabBarStyle: {
-          height: 64,
-          paddingTop: 6,
-          paddingBottom: 6,
-          backgroundColor: colors.background,
-          borderTopColor: colors.backgroundSelected,
+          backgroundColor: theme.backgroundElement,
+          borderTopColor: theme.separator,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          height: Platform.select({ ios: 84, default: 64 }),
+          paddingTop: 8,
+          paddingBottom: Platform.select({ ios: 28, default: 8 }),
         },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '500', letterSpacing: 0.06 },
+        tabBarItemStyle: { paddingTop: 2 },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Wearable',
-          tabBarIcon: ({ color }) => <Image source={require('@/assets/images/tabIcons/home.png')} style={{ width: 22, height: 22, tintColor: color }} />,
+          title: t.wearable,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'watch' : 'watch-outline'} size={24} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <Image source={require('@/assets/images/tabIcons/explore.png')} style={{ width: 22, height: 22, tintColor: color }} />,
+          title: t.settings,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />
+          ),
         }}
       />
     </Tabs>
