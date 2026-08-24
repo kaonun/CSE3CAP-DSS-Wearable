@@ -56,16 +56,30 @@ export function useNfc() {
    * entirely, with no prompt and no vibration, until NFC is toggled.
    */
   useEffect(() => {
+    let pending: ReturnType<typeof setTimeout> | undefined;
+
     const subscription = AppState.addEventListener('change', state => {
-      if (state !== 'active') {
+      if (state === 'active') {
+        // Came straight back — this was a blip, not a real backgrounding.
+        if (pending) clearTimeout(pending);
+        pending = undefined;
+        return;
+      }
+      // Only 'background' counts, and only if it sticks. Detecting a tag makes
+      // the activity pause briefly, and cancelling on that transition killed
+      // the very read the tag was meant to complete.
+      if (state !== 'background' || pending) return;
+      pending = setTimeout(() => {
+        pending = undefined;
         cancelRequested.current = true;
         setReading(false);
         void cancelNfcRead().catch(() => undefined);
-      }
+      }, 1500);
     });
 
     return () => {
       subscription.remove();
+      if (pending) clearTimeout(pending);
       cancelRequested.current = true;
       void cancelNfcRead().catch(() => undefined);
     };
