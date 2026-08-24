@@ -75,6 +75,10 @@ export const vi: Messages = {
   noDevicesFound: 'Không tìm thấy thiết bị',
   heartRateSensor: 'Cảm biến nhịp tim',
   unnamedDevice: 'Thiết bị chưa đặt tên',
+  connectAnother: 'Kết nối thiết bị khác',
+  disconnectAll: 'Ngắt kết nối tất cả',
+  noDeviceConnected: 'Chưa kết nối thiết bị',
+  noDeviceConnectedHelp: 'Kết nối thiết bị để xem số đo trực tiếp.',
 
   settings: 'Cài đặt',
   settingsSubtitle: 'Cá nhân hóa trải nghiệm DSS Wearable của bạn.',

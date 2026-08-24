@@ -75,6 +75,10 @@ export const zh: Messages = {
   noDevicesFound: '未找到设备',
   heartRateSensor: '心率传感器',
   unnamedDevice: '未命名设备',
+  connectAnother: '连接其他设备',
+  disconnectAll: '全部断开',
+  noDeviceConnected: '未连接设备',
+  noDeviceConnectedHelp: '连接设备以查看实时读数。',
 
   settings: '设置',
   settingsSubtitle: '个性化您的 DSS Wearable 体验。',

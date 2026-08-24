@@ -75,6 +75,10 @@ export const ar: Messages = {
   noDevicesFound: 'لم يتم العثور على أجهزة',
   heartRateSensor: 'مستشعر معدل ضربات القلب',
   unnamedDevice: 'جهاز بلا اسم',
+  connectAnother: 'توصيل جهاز آخر',
+  disconnectAll: 'قطع الاتصال بالكل',
+  noDeviceConnected: 'لا يوجد جهاز متصل',
+  noDeviceConnectedHelp: 'وصّل جهازًا لعرض القراءات المباشرة.',
 
   settings: 'الإعدادات',
   settingsSubtitle: 'خصّص تجربتك مع DSS Wearable.',

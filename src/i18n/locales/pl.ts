@@ -75,6 +75,10 @@ export const pl: Messages = {
   noDevicesFound: 'Nie znaleziono urządzeń',
   heartRateSensor: 'Czujnik tętna',
   unnamedDevice: 'Urządzenie bez nazwy',
+  connectAnother: 'Połącz inne urządzenie',
+  disconnectAll: 'Rozłącz wszystkie',
+  noDeviceConnected: 'Brak połączonego urządzenia',
+  noDeviceConnectedHelp: 'Połącz urządzenie, aby zobaczyć odczyty na żywo.',
 
   settings: 'Ustawienia',
   settingsSubtitle: 'Spersonalizuj swoje doświadczenie DSS Wearable.',

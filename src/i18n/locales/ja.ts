@@ -75,6 +75,10 @@ export const ja: Messages = {
   noDevicesFound: 'デバイスが見つかりません',
   heartRateSensor: '心拍センサー',
   unnamedDevice: '名称未設定のデバイス',
+  connectAnother: '別のデバイスを接続',
+  disconnectAll: 'すべて切断',
+  noDeviceConnected: 'デバイスが接続されていません',
+  noDeviceConnectedHelp: 'デバイスを接続すると測定値が表示されます。',
 
   settings: '設定',
   settingsSubtitle: 'DSS Wearable の体験をカスタマイズします。',

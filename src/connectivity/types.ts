@@ -30,4 +30,17 @@ export type SensorReading = {
   timestamp: number;
 };
 
+/** Live state for one currently-connected device. */
+export type ConnectedDevice = {
+  id: string;
+  /** Null when the peripheral advertised no name. */
+  name: string | null;
+  /** Most recent reading, or null before the first one arrives. */
+  heartRate: number | null;
+  /** Recent readings for the sparkline, newest last. */
+  history: number[];
+  /** Timestamp of the most recent reading. */
+  updatedAt: number | null;
+};
+
 export type BleReadingHandler = (reading: SensorReading) => void;

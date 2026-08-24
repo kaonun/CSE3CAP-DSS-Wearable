@@ -75,6 +75,10 @@ export const tr: Messages = {
   noDevicesFound: 'Cihaz bulunamadı',
   heartRateSensor: 'Nabız sensörü',
   unnamedDevice: 'Adsız cihaz',
+  connectAnother: 'Başka Cihaz Bağla',
+  disconnectAll: 'Tümünü Kes',
+  noDeviceConnected: 'Bağlı cihaz yok',
+  noDeviceConnectedHelp: 'Canlı ölçümleri görmek için bir cihaz bağlayın.',
 
   settings: 'Ayarlar',
   settingsSubtitle: 'DSS Wearable deneyiminizi kişiselleştirin.',

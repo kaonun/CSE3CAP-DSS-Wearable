@@ -59,7 +59,8 @@ export default function WearableScreen() {
   const nfc = useNfc();
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const isConnected = ble.connectedDeviceIds.length > 0;
+  const connectedCount = ble.connectedDevices.length;
+  const isConnected = connectedCount > 0;
   const isBusy = ble.status === 'connecting' || ble.status === 'disconnecting';
 
   const statusCopy: Record<string, string> = {
@@ -70,15 +71,6 @@ export default function WearableScreen() {
     disconnecting: t.connecting,
     error: t.connectionError,
   };
-
-  const statusColor =
-    ble.status === 'error' ? theme.danger : isConnected ? theme.live : theme.textSecondary;
-
-  // The most recent history entry names whichever device is live right now.
-  const activeDevice = useMemo(
-    () => ble.connectionHistory.find(entry => ble.connectedDeviceIds.includes(entry.id)),
-    [ble.connectionHistory, ble.connectedDeviceIds],
-  );
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -104,60 +96,97 @@ export default function WearableScreen() {
             </Pressable>
           </View>
 
-          {/* Live metrics */}
-          <Card style={styles.hero}>
-            <View style={styles.heroTop}>
-              <View style={styles.heroLabels}>
-                <ThemedText type="footnote" themeColor="textSecondary" style={styles.label}>
-                  {t.connection}
+          {/* One live card per connected device. */}
+          {isConnected ? (
+            ble.connectedDevices.map(device => (
+              <Card key={device.id} style={styles.hero}>
+                <View style={styles.heroTop}>
+                  <View style={styles.heroLabels}>
+                    <ThemedText type="footnote" themeColor="textSecondary" style={styles.label}>
+                      {t.connection}
+                    </ThemedText>
+                    <ThemedText type="headline" numberOfLines={1}>
+                      {device.name || t.unnamedDevice}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.heroActions}>
+                    <StatusPill label={t.connected} color={theme.live} />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t.disconnect} ${device.name ?? t.unnamedDevice}`}
+                      hitSlop={10}
+                      disabled={isBusy}
+                      onPress={() => ble.disconnect(device.id)}
+                      style={({ pressed }) => [styles.cardAction, { opacity: pressed ? 0.5 : 1 }]}>
+                      <Ionicons name="close-circle" size={22} color={theme.textTertiary} />
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={styles.metricRow}>
+                  <ThemedText type="metric" themeColor={device.heartRate ? 'text' : 'textTertiary'}>
+                    {device.heartRate ?? '--'}
+                  </ThemedText>
+                  <ThemedText type="title3" themeColor="textSecondary" style={styles.unit}>
+                    {t.bpm}
+                  </ThemedText>
+                </View>
+
+                {device.history.length > 1 ? (
+                  <Sparkline values={device.history} color={theme.tint} />
+                ) : (
+                  <View style={styles.emptyTrace}>
+                    <ThemedText type="footnote" themeColor="textTertiary">
+                      {t.noLiveReading}
+                    </ThemedText>
+                  </View>
+                )}
+              </Card>
+            ))
+          ) : (
+            <Card style={styles.hero}>
+              <View style={styles.heroTop}>
+                <View style={styles.heroLabels}>
+                  <ThemedText type="footnote" themeColor="textSecondary" style={styles.label}>
+                    {t.connection}
+                  </ThemedText>
+                  <ThemedText type="headline">{statusCopy[ble.status] ?? ble.status}</ThemedText>
+                </View>
+                <StatusPill
+                  label={t.notConnected}
+                  color={ble.status === 'error' ? theme.danger : theme.textSecondary}
+                />
+              </View>
+              <View style={styles.emptyState}>
+                <Ionicons name="pulse-outline" size={30} color={theme.textTertiary} />
+                <ThemedText type="body" themeColor="textSecondary">
+                  {t.noDeviceConnected}
                 </ThemedText>
-                <ThemedText type="headline" numberOfLines={1}>
-                  {isConnected && activeDevice
-                    ? (activeDevice.name || t.unnamedDevice)
-                    : (statusCopy[ble.status] ?? ble.status)}
+                <ThemedText type="footnote" themeColor="textTertiary" style={styles.centered}>
+                  {t.noDeviceConnectedHelp}
                 </ThemedText>
               </View>
-              <StatusPill label={isConnected ? t.connected : t.notConnected} color={statusColor} />
-            </View>
-
-            <View style={styles.metricRow}>
-              <ThemedText type="metric" themeColor={ble.heartRate ? 'text' : 'textTertiary'}>
-                {ble.heartRate ?? '--'}
-              </ThemedText>
-              <ThemedText type="title3" themeColor="textSecondary" style={styles.unit}>
-                {t.bpm}
-              </ThemedText>
-            </View>
-
-            {ble.heartRateHistory.length > 1 ? (
-              <Sparkline values={ble.heartRateHistory} color={theme.tint} />
-            ) : (
-              <View style={styles.emptyTrace}>
-                <ThemedText type="footnote" themeColor="textTertiary">
-                  {t.noLiveReading}
-                </ThemedText>
-              </View>
-            )}
-          </Card>
+            </Card>
+          )}
 
           {/* One connection entry point for both Bluetooth and NFC */}
-          {isConnected ? (
+          <Button
+            label={isConnected ? t.connectAnother : t.connectDevice}
+            icon="add-circle-outline"
+            variant={isConnected ? 'tinted' : 'filled'}
+            loading={isBusy}
+            disabled={isBusy}
+            onPress={() => setSheetOpen(true)}
+          />
+
+          {connectedCount > 1 ? (
             <Button
-              label={t.disconnect}
-              variant="destructive"
-              loading={isBusy}
+              label={t.disconnectAll}
+              variant="plain"
               disabled={isBusy}
               onPress={() => ble.disconnect()}
             />
-          ) : (
-            <Button
-              label={t.connectDevice}
-              icon="add-circle-outline"
-              loading={isBusy}
-              disabled={isBusy}
-              onPress={() => setSheetOpen(true)}
-            />
-          )}
+          ) : null}
 
           {ble.error && !sheetOpen ? (
             <View
@@ -260,6 +289,10 @@ const styles = StyleSheet.create({
   hero: { padding: Spacing.four, gap: Spacing.three },
   heroTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.two },
   heroLabels: { flex: 1, gap: Spacing.half },
+  heroActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  cardAction: { padding: Spacing.half },
+  emptyState: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.four },
+  centered: { textAlign: 'center' },
   metricRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
   unit: { marginBottom: Spacing.one },
   emptyTrace: { height: 52, justifyContent: 'center' },

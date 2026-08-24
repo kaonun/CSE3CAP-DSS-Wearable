@@ -75,6 +75,10 @@ export const nl: Messages = {
   noDevicesFound: 'Geen apparaten gevonden',
   heartRateSensor: 'Hartslagsensor',
   unnamedDevice: 'Naamloos apparaat',
+  connectAnother: 'Ander apparaat verbinden',
+  disconnectAll: 'Alles verbreken',
+  noDeviceConnected: 'Geen apparaat verbonden',
+  noDeviceConnectedHelp: 'Verbind een apparaat om live metingen te zien.',
 
   settings: 'Instellingen',
   settingsSubtitle: 'Personaliseer je DSS Wearable-ervaring.',

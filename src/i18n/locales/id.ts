@@ -75,6 +75,10 @@ export const id: Messages = {
   noDevicesFound: 'Tidak ada perangkat ditemukan',
   heartRateSensor: 'Sensor detak jantung',
   unnamedDevice: 'Perangkat tanpa nama',
+  connectAnother: 'Hubungkan Perangkat Lain',
+  disconnectAll: 'Putuskan Semua',
+  noDeviceConnected: 'Tidak ada perangkat terhubung',
+  noDeviceConnectedHelp: 'Hubungkan perangkat untuk melihat pembacaan langsung.',
 
   settings: 'Pengaturan',
   settingsSubtitle: 'Personalisasi pengalaman DSS Wearable Anda.',

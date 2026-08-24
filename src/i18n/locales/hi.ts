@@ -75,6 +75,10 @@ export const hi: Messages = {
   noDevicesFound: 'कोई डिवाइस नहीं मिला',
   heartRateSensor: 'हृदय गति सेंसर',
   unnamedDevice: 'बिना नाम का डिवाइस',
+  connectAnother: 'दूसरा डिवाइस कनेक्ट करें',
+  disconnectAll: 'सभी डिस्कनेक्ट करें',
+  noDeviceConnected: 'कोई डिवाइस कनेक्ट नहीं है',
+  noDeviceConnectedHelp: 'लाइव रीडिंग देखने के लिए डिवाइस कनेक्ट करें।',
 
   settings: 'सेटिंग्स',
   settingsSubtitle: 'अपना DSS Wearable अनुभव वैयक्तिकृत करें।',

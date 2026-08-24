@@ -75,6 +75,10 @@ export const ko: Messages = {
   noDevicesFound: '기기를 찾을 수 없습니다',
   heartRateSensor: '심박수 센서',
   unnamedDevice: '이름 없는 기기',
+  connectAnother: '다른 기기 연결',
+  disconnectAll: '모두 연결 해제',
+  noDeviceConnected: '연결된 기기 없음',
+  noDeviceConnectedHelp: '실시간 측정값을 보려면 기기를 연결하세요.',
 
   settings: '설정',
   settingsSubtitle: 'DSS Wearable 경험을 개인화하세요.',

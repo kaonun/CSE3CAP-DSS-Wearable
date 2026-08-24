@@ -75,6 +75,10 @@ export type Messages = {
   noDevicesFound: string;
   heartRateSensor: string;
   unnamedDevice: string;
+  connectAnother: string;
+  disconnectAll: string;
+  noDeviceConnected: string;
+  noDeviceConnectedHelp: string;
   // Settings
   settings: string;
   settingsSubtitle: string;

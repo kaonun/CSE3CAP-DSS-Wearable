@@ -75,6 +75,10 @@ export const ru: Messages = {
   noDevicesFound: 'Устройства не найдены',
   heartRateSensor: 'Датчик пульса',
   unnamedDevice: 'Устройство без имени',
+  connectAnother: 'Подключить ещё устройство',
+  disconnectAll: 'Отключить все',
+  noDeviceConnected: 'Нет подключённых устройств',
+  noDeviceConnectedHelp: 'Подключите устройство, чтобы видеть показания в реальном времени.',
 
   settings: 'Настройки',
   settingsSubtitle: 'Настройте DSS Wearable под себя.',

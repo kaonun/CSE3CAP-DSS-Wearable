@@ -1,13 +1,24 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {connectBleDevice, destroyBle, disconnectBleDevice, scanBleDevices, stopBleScan} from './bleService';
-import {BleDeviceInfo, BleReadingHandler, ConnectionHistoryEntry, ConnectionStatus, SensorReading} from './types';
+import {
+  BleDeviceInfo,
+  BleReadingHandler,
+  ConnectedDevice,
+  ConnectionHistoryEntry,
+  ConnectionStatus,
+  SensorReading,
+} from './types';
+
+/** How many readings each device keeps for its sparkline. */
+const TRACE_LENGTH = 24;
 
 export function useBleDevice(onReading?: BleReadingHandler) {
   const [status, setStatus] = useState<ConnectionStatus>('idle');
   const [devices, setDevices] = useState<BleDeviceInfo[]>([]);
-  const [connectedDeviceIds, setConnectedDeviceIds] = useState<string[]>([]);
-  const [heartRate, setHeartRate] = useState<number | null>(null);
-  const [heartRateHistory, setHeartRateHistory] = useState<number[]>([]);
+  // One entry per live connection. The BLE service already supports several
+  // simultaneous connections (it keys them by id); this mirrors that shape so
+  // readings never collapse into a single device's value.
+  const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [connectionHistory, setConnectionHistory] = useState<ConnectionHistoryEntry[]>([]);
   const [connectingDeviceId, setConnectingDeviceId] = useState<string | null>(null);
@@ -15,8 +26,8 @@ export function useBleDevice(onReading?: BleReadingHandler) {
   const callbackRef = useRef(onReading);
   callbackRef.current = onReading;
 
-  // Mirrors of state for use inside callbacks and long-lived BLE subscriptions,
-  // so those closures never need to be rebuilt when the values change.
+  // Mirrors of state for use inside long-lived BLE subscriptions, so those
+  // closures never need rebuilding when the values change.
   const connectedIds = useRef(new Set<string>());
   const devicesRef = useRef<BleDeviceInfo[]>([]);
   devicesRef.current = devices;
@@ -27,21 +38,6 @@ export function useBleDevice(onReading?: BleReadingHandler) {
     connectedIds.current.clear();
   }, []);
 
-  /** Publishes the connected-id set to state and clears readings when empty. */
-  const publishConnected = useCallback(() => {
-    const ids = Array.from(connectedIds.current);
-    setConnectedDeviceIds(ids);
-    if (ids.length === 0) {
-      setHeartRate(null);
-      setHeartRateHistory([]);
-    }
-    return ids;
-  }, []);
-
-  // Every returned callback is memoised with a stable identity. Consumers put
-  // these in effect dependency arrays (the connect sheet auto-connects on an
-  // NFC tag read), and unstable identities there re-fire the effect on every
-  // render — which previously produced a connect/fail/reconnect loop.
   const scan = useCallback(async () => {
     setStatus('scanning');
     setError(null);
@@ -54,8 +50,12 @@ export function useBleDevice(onReading?: BleReadingHandler) {
     }
   }, []);
 
+  // Every returned callback is memoised with a stable identity. Consumers put
+  // these in effect dependency arrays (the connect sheet auto-connects on an
+  // NFC tag read), and unstable identities there re-fire the effect on every
+  // render — which previously produced a connect/fail/reconnect loop.
   const connect = useCallback(async (deviceId: string) => {
-    // Ignore repeat requests for a device that is already wired up or in flight.
+    // Ignore repeat requests for a device that is already wired up.
     if (connectedIds.current.has(deviceId)) return;
     setStatus('connecting');
     setError(null);
@@ -63,26 +63,40 @@ export function useBleDevice(onReading?: BleReadingHandler) {
     try {
       await connectBleDevice(deviceId, (reading: SensorReading) => {
         if (reading.metric === 'heartRate') {
-          setHeartRate(reading.value);
-          setHeartRateHistory(current => [...current, reading.value].slice(-24));
+          setConnectedDevices(current =>
+            current.map(device =>
+              device.id === reading.deviceId
+                ? {
+                    ...device,
+                    heartRate: reading.value,
+                    history: [...device.history, reading.value].slice(-TRACE_LENGTH),
+                    updatedAt: reading.timestamp,
+                  }
+                : device,
+            ),
+          );
         }
         callbackRef.current?.(reading);
       }, connectError => {
         connectedIds.current.delete(deviceId);
-        const remaining = publishConnected();
+        setConnectedDevices(current => current.filter(device => device.id !== deviceId));
         setError(connectError.message);
-        setStatus(remaining.length ? 'connected' : 'error');
+        setStatus(connectedIds.current.size ? 'connected' : 'error');
       });
+
       connectedIds.current.add(deviceId);
-      publishConnected();
+      // Null name when the peripheral never advertised one, or when the device
+      // came from an NFC tag and was never in a scan result. The UI supplies a
+      // translated placeholder rather than baking English in here.
+      const name = devicesRef.current.find(device => device.id === deviceId)?.name ?? null;
+
+      setConnectedDevices(current =>
+        current.some(device => device.id === deviceId)
+          ? current
+          : [...current, {id: deviceId, name, heartRate: null, history: [], updatedAt: null}],
+      );
       setConnectionHistory(current => [
-        {
-          id: deviceId,
-          // Null when the peripheral never advertised a name; the UI supplies
-          // a translated placeholder rather than baking English in here.
-          name: devicesRef.current.find(device => device.id === deviceId)?.name ?? null,
-          connectedAt: Date.now(),
-        },
+        {id: deviceId, name, connectedAt: Date.now()},
         ...current.filter(entry => entry.id !== deviceId),
       ].slice(0, 5));
       setStatus('connected');
@@ -92,26 +106,30 @@ export function useBleDevice(onReading?: BleReadingHandler) {
     } finally {
       setConnectingDeviceId(null);
     }
-  }, [publishConnected]);
+  }, []);
 
+  /** Disconnects one device, or every device when no id is given. */
   const disconnect = useCallback((deviceId?: string) => {
     setStatus('disconnecting');
     disconnectBleDevice(deviceId);
-    if (deviceId) connectedIds.current.delete(deviceId);
-    else connectedIds.current.clear();
-    const remaining = publishConnected();
+    if (deviceId) {
+      connectedIds.current.delete(deviceId);
+      setConnectedDevices(current => current.filter(device => device.id !== deviceId));
+    } else {
+      connectedIds.current.clear();
+      setConnectedDevices([]);
+    }
     setError(null);
-    setStatus(remaining.length ? 'connected' : 'idle');
-  }, [publishConnected]);
+    setStatus(connectedIds.current.size ? 'connected' : 'idle');
+  }, []);
 
   return {
     status,
     devices,
     connectingDeviceId,
-    connectedDeviceIds,
+    connectedDevices,
+    connectedDeviceIds: connectedDevices.map(device => device.id),
     connectionHistory,
-    heartRate,
-    heartRateHistory,
     error,
     scan,
     connect,

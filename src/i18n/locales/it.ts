@@ -75,6 +75,10 @@ export const it: Messages = {
   noDevicesFound: 'Nessun dispositivo trovato',
   heartRateSensor: 'Sensore di frequenza cardiaca',
   unnamedDevice: 'Dispositivo senza nome',
+  connectAnother: 'Connetti un altro dispositivo',
+  disconnectAll: 'Disconnetti tutto',
+  noDeviceConnected: 'Nessun dispositivo connesso',
+  noDeviceConnectedHelp: 'Connetti un dispositivo per vedere le letture in tempo reale.',
 
   settings: 'Impostazioni',
   settingsSubtitle: 'Personalizza la tua esperienza DSS Wearable.',
