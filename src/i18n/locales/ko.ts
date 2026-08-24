@@ -79,6 +79,7 @@ export const ko: Messages = {
   disconnectAll: '모두 연결 해제',
   noDeviceConnected: '연결된 기기 없음',
   noDeviceConnectedHelp: '실시간 측정값을 보려면 기기를 연결하세요.',
+  disconnectedFrom: '{device} 연결이 해제되었습니다',
 
   settings: '설정',
   settingsSubtitle: 'DSS Wearable 경험을 개인화하세요.',

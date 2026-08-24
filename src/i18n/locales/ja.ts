@@ -79,6 +79,7 @@ export const ja: Messages = {
   disconnectAll: 'すべて切断',
   noDeviceConnected: 'デバイスが接続されていません',
   noDeviceConnectedHelp: 'デバイスを接続すると測定値が表示されます。',
+  disconnectedFrom: '{device} との接続を解除しました',
 
   settings: '設定',
   settingsSubtitle: 'DSS Wearable の体験をカスタマイズします。',

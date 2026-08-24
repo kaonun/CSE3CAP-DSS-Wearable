@@ -79,6 +79,7 @@ export const ar: Messages = {
   disconnectAll: 'قطع الاتصال بالكل',
   noDeviceConnected: 'لا يوجد جهاز متصل',
   noDeviceConnectedHelp: 'وصّل جهازًا لعرض القراءات المباشرة.',
+  disconnectedFrom: 'تم قطع الاتصال بـ {device}',
 
   settings: 'الإعدادات',
   settingsSubtitle: 'خصّص تجربتك مع DSS Wearable.',

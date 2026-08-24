@@ -79,6 +79,7 @@ export const hi: Messages = {
   disconnectAll: 'सभी डिस्कनेक्ट करें',
   noDeviceConnected: 'कोई डिवाइस कनेक्ट नहीं है',
   noDeviceConnectedHelp: 'लाइव रीडिंग देखने के लिए डिवाइस कनेक्ट करें।',
+  disconnectedFrom: '{device} से डिस्कनेक्ट हो गया',
 
   settings: 'सेटिंग्स',
   settingsSubtitle: 'अपना DSS Wearable अनुभव वैयक्तिकृत करें।',

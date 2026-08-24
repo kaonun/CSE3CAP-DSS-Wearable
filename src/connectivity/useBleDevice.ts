@@ -22,6 +22,8 @@ export function useBleDevice(onReading?: BleReadingHandler) {
   const [error, setError] = useState<string | null>(null);
   const [connectionHistory, setConnectionHistory] = useState<ConnectionHistoryEntry[]>([]);
   const [connectingDeviceId, setConnectingDeviceId] = useState<string | null>(null);
+  /** Names of devices just disconnected, shown briefly as confirmation. */
+  const [disconnectedNames, setDisconnectedNames] = useState<string[]>([]);
 
   const callbackRef = useRef(onReading);
   callbackRef.current = onReading;
@@ -122,17 +124,30 @@ export function useBleDevice(onReading?: BleReadingHandler) {
   /** Disconnects one device, or every device when no id is given. */
   const disconnect = useCallback((deviceId?: string) => {
     setStatus('disconnecting');
+
+    // Capture names before the entries are removed, so the confirmation can
+    // say which device it was.
+    setConnectedDevices(current => {
+      const removed = deviceId ? current.filter(device => device.id === deviceId) : current;
+      const names = removed.map(device => device.name || device.id);
+      if (names.length > 0) setDisconnectedNames(names);
+      return deviceId ? current.filter(device => device.id !== deviceId) : [];
+    });
+
     disconnectBleDevice(deviceId);
-    if (deviceId) {
-      connectedIds.current.delete(deviceId);
-      setConnectedDevices(current => current.filter(device => device.id !== deviceId));
-    } else {
-      connectedIds.current.clear();
-      setConnectedDevices([]);
-    }
+    if (deviceId) connectedIds.current.delete(deviceId);
+    else connectedIds.current.clear();
+
     setError(null);
     setStatus(connectedIds.current.size ? 'connected' : 'idle');
   }, []);
+
+  /** Clears the disconnect confirmation after a moment. */
+  useEffect(() => {
+    if (disconnectedNames.length === 0) return;
+    const timer = setTimeout(() => setDisconnectedNames([]), 4000);
+    return () => clearTimeout(timer);
+  }, [disconnectedNames]);
 
   return {
     status,
@@ -141,6 +156,7 @@ export function useBleDevice(onReading?: BleReadingHandler) {
     connectedDevices,
     connectedDeviceIds: connectedDevices.map(device => device.id),
     connectionHistory,
+    disconnectedNames,
     error,
     scan,
     connect,

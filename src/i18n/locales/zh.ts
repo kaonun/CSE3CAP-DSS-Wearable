@@ -79,6 +79,7 @@ export const zh: Messages = {
   disconnectAll: '全部断开',
   noDeviceConnected: '未连接设备',
   noDeviceConnectedHelp: '连接设备以查看实时读数。',
+  disconnectedFrom: '已断开与 {device} 的连接',
 
   settings: '设置',
   settingsSubtitle: '个性化您的 DSS Wearable 体验。',

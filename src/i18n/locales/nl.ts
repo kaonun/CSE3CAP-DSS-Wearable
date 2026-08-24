@@ -79,6 +79,7 @@ export const nl: Messages = {
   disconnectAll: 'Alles verbreken',
   noDeviceConnected: 'Geen apparaat verbonden',
   noDeviceConnectedHelp: 'Verbind een apparaat om live metingen te zien.',
+  disconnectedFrom: 'Verbinding met {device} verbroken',
 
   settings: 'Instellingen',
   settingsSubtitle: 'Personaliseer je DSS Wearable-ervaring.',

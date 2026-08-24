@@ -119,6 +119,11 @@ export default function WearableScreen() {
                     <ThemedText type="headline" numberOfLines={1}>
                       {device.name || t.unnamedDevice}
                     </ThemedText>
+                    {/* The address is the only reliable identifier when a
+                        peripheral advertises no name. */}
+                    <ThemedText type="caption" themeColor="textTertiary" numberOfLines={1} selectable>
+                      {device.id}
+                    </ThemedText>
                   </View>
                   <View style={styles.heroActions}>
                     <StatusPill label={t.connected} color={theme.live} />
@@ -199,7 +204,19 @@ export default function WearableScreen() {
             />
           ) : null}
 
-          {ble.error && !sheetOpen ? (
+          {/* A disconnect the user asked for is a confirmation, not a fault. */}
+          {ble.disconnectedNames.length > 0 ? (
+            <View
+              style={[
+                styles.errorBanner,
+                { backgroundColor: theme.fill, borderLeftColor: theme.textTertiary },
+              ]}>
+              <Ionicons name="checkmark-circle" size={16} color={theme.textSecondary} />
+              <ThemedText type="footnote" themeColor="textSecondary" style={styles.flex}>
+                {t.disconnectedFrom.replace('{device}', ble.disconnectedNames.join(', '))}
+              </ThemedText>
+            </View>
+          ) : ble.error && !sheetOpen ? (
             <View
               style={[
                 styles.errorBanner,
@@ -231,7 +248,12 @@ export default function WearableScreen() {
                           <ThemedText type="body" numberOfLines={1}>
                             {entry.name || t.unnamedDevice}
                           </ThemedText>
-                          <ThemedText type="footnote" themeColor="textSecondary">
+                          <ThemedText type="caption" themeColor="textTertiary" numberOfLines={1} selectable>
+                            {entry.id}
+                          </ThemedText>
+                          <ThemedText
+                            type="footnote"
+                            style={{ color: live ? theme.live : theme.textSecondary }}>
                             {live ? t.connected : t.bluetoothWearable}
                           </ThemedText>
                         </View>

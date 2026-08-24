@@ -79,6 +79,7 @@ export const pt: Messages = {
   disconnectAll: 'Desligar tudo',
   noDeviceConnected: 'Nenhum dispositivo ligado',
   noDeviceConnectedHelp: 'Ligue um dispositivo para ver leituras em direto.',
+  disconnectedFrom: 'Desligado de {device}',
 
   settings: 'Definições',
   settingsSubtitle: 'Personalize a sua experiência DSS Wearable.',

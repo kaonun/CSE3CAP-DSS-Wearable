@@ -79,6 +79,7 @@ export const id: Messages = {
   disconnectAll: 'Putuskan Semua',
   noDeviceConnected: 'Tidak ada perangkat terhubung',
   noDeviceConnectedHelp: 'Hubungkan perangkat untuk melihat pembacaan langsung.',
+  disconnectedFrom: 'Terputus dari {device}',
 
   settings: 'Pengaturan',
   settingsSubtitle: 'Personalisasi pengalaman DSS Wearable Anda.',

@@ -79,6 +79,7 @@ export const ru: Messages = {
   disconnectAll: 'Отключить все',
   noDeviceConnected: 'Нет подключённых устройств',
   noDeviceConnectedHelp: 'Подключите устройство, чтобы видеть показания в реальном времени.',
+  disconnectedFrom: 'Отключено от {device}',
 
   settings: 'Настройки',
   settingsSubtitle: 'Настройте DSS Wearable под себя.',

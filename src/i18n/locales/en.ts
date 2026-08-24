@@ -80,6 +80,7 @@ export const en: Messages = {
   disconnectAll: 'Disconnect All',
   noDeviceConnected: 'No device connected',
   noDeviceConnectedHelp: 'Connect a wearable to see live readings.',
+  disconnectedFrom: 'Disconnected from {device}',
 
   settings: 'Settings',
   settingsSubtitle: 'Personalise your DSS Wearable experience.',

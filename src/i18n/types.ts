@@ -79,6 +79,7 @@ export type Messages = {
   disconnectAll: string;
   noDeviceConnected: string;
   noDeviceConnectedHelp: string;
+  disconnectedFrom: string;
   // Settings
   settings: string;
   settingsSubtitle: string;
