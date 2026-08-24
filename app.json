@@ -4,11 +4,11 @@
     "slug": "DSS-wearable",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/dss-wearable-logo.png",
+    "icon": "./assets/images/app-icon.png",
     "scheme": "dsswearable",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/dss-wearable-logo.png",
+      "icon": "./assets/images/app-icon.png",
       "bundleIdentifier": "com.fusionfive.dsswearable",
       "supportsTablet": false
     },
@@ -16,7 +16,7 @@
       "package": "com.fusionfive.dsswearable",
       "predictiveBackGestureEnabled": false,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/dss-wearable-logo.png",
+        "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
         "backgroundColor": "#FFFFFF"
       },
       "permissions": [
