@@ -134,8 +134,60 @@ function decodeBluetoothOobAddress(payload: unknown): string {
   return validateTagId(address);
 }
 
-export async function readNfcTag(): Promise<string> {
-  if (isMockMode) return mockNfcRead();
+/** EIR data types carrying a device name (Bluetooth Assigned Numbers). */
+const EIR_SHORTENED_LOCAL_NAME = 0x08;
+const EIR_COMPLETE_LOCAL_NAME = 0x09;
+
+/**
+ * Pulls the device name out of a Bluetooth OOB record, if the tag carries one.
+ *
+ * A connection made from a tag never went through a scan, so there is no
+ * advertised name to fall back on — the device shows only its address. The OOB
+ * payload can carry the name itself: after the length and address come EIR
+ * structures, each a length byte, a type byte, then its data.
+ */
+function decodeBluetoothOobName(payload: unknown): string | null {
+  let bytes: Uint8Array;
+  try {
+    bytes = asBytes(payload);
+  } catch {
+    return null;
+  }
+  if (bytes.length < 8) return null;
+
+  let offset = 8;
+  while (offset < bytes.length) {
+    const length = bytes[offset];
+    // A zero length terminates the sequence; a run past the end means the
+    // record is malformed, so stop rather than guess.
+    if (length === 0 || offset + length >= bytes.length + 1) break;
+
+    const type = bytes[offset + 1];
+    if (type === EIR_COMPLETE_LOCAL_NAME || type === EIR_SHORTENED_LOCAL_NAME) {
+      const nameBytes = bytes.slice(offset + 2, offset + 1 + length);
+      try {
+        const name = new TextDecoder('utf-8', {fatal: false})
+          .decode(nameBytes)
+          .replace(/\u0000/g, '')
+          .trim();
+        if (name) return name;
+      } catch {
+        return null;
+      }
+    }
+    offset += length + 1;
+  }
+  return null;
+}
+
+export type NfcTagResult = {
+  deviceId: string;
+  /** Name carried by the tag, when it has one. */
+  deviceName: string | null;
+};
+
+export async function readNfcTag(): Promise<NfcTagResult> {
+  if (isMockMode) return {deviceId: await mockNfcRead(), deviceName: null};
 
   // Native NFC is loaded only at point of use, preserving Expo Go mock mode.
   const NfcManagerModule = require('react-native-nfc-manager') as NfcModule;
@@ -163,13 +215,22 @@ export async function readNfcTag(): Promise<string> {
     const records = tag?.ndefMessage ?? [];
 
     const textRecord = records.find(item => isTextRecord(item, NfcManagerModule.Ndef));
-    if (textRecord) return decodeNdefDeviceId(textRecord.payload);
+    if (textRecord) {
+      return {deviceId: decodeNdefDeviceId(textRecord.payload), deviceName: null};
+    }
 
     const bluetoothRecord = records.find(item => isBluetoothOobRecord(item, NfcManagerModule.Ndef));
-    if (bluetoothRecord) return decodeBluetoothOobAddress(bluetoothRecord.payload);
+    if (bluetoothRecord) {
+      return {
+        deviceId: decodeBluetoothOobAddress(bluetoothRecord.payload),
+        // The pairing record often carries the name alongside the address,
+        // which is the only chance of a name for a tag-initiated connection.
+        deviceName: decodeBluetoothOobName(bluetoothRecord.payload),
+      };
+    }
 
     const fallback = records.find(item => item.payload !== undefined);
-    return decodeNdefDeviceId(fallback?.payload);
+    return {deviceId: decodeNdefDeviceId(fallback?.payload), deviceName: null};
   } finally {
     await nfc.cancelTechnologyRequest().catch(() => undefined);
     activeNfc = undefined;

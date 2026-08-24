@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectSheet } from '@/components/connect-sheet';
+import { BeatingHeart, HeartRateTrace } from '@/components/heart-rate-trace';
 import { SessionDuration } from '@/components/session-duration';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
@@ -26,29 +27,6 @@ function StatusPill({ label, color }: { label: string; color: string }) {
       <ThemedText type="caption" style={{ color }}>
         {label}
       </ThemedText>
-    </View>
-  );
-}
-
-function Sparkline({ values, color }: { values: number[]; color: string }) {
-  if (values.length === 0) return null;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = Math.max(max - min, 1);
-  return (
-    <View style={styles.sparkline}>
-      {values.map((value, index) => {
-        const ratio = (value - min) / range;
-        return (
-          <View
-            key={index}
-            style={[
-              styles.sparkBar,
-              { height: 8 + ratio * 44, backgroundColor: color, opacity: 0.3 + ratio * 0.7 },
-            ]}
-          />
-        );
-      })}
     </View>
   );
 }
@@ -141,6 +119,7 @@ export default function WearableScreen() {
                 </View>
 
                 <View style={styles.metricRow}>
+                  <BeatingHeart beatKey={device.updatedAt} idle={!device.heartRate} />
                   <ThemedText type="metric" themeColor={device.heartRate ? 'text' : 'textTertiary'}>
                     {device.heartRate ?? '--'}
                   </ThemedText>
@@ -150,7 +129,7 @@ export default function WearableScreen() {
                 </View>
 
                 {device.history.length > 1 ? (
-                  <Sparkline values={device.history} color={theme.tint} />
+                  <HeartRateTrace values={device.history} color={theme.tint} />
                 ) : (
                   <View style={styles.emptyTrace}>
                     <ThemedText type="footnote" themeColor="textTertiary">

@@ -4,6 +4,8 @@ import {cancelNfcRead, readNfcTag} from './nfcService';
 
 export function useNfc() {
   const [tagId, setTagId] = useState<string | null>(null);
+  /** Name carried by the tag, when it has one. */
+  const [tagName, setTagName] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cancelRequested = useRef(false);
@@ -21,7 +23,10 @@ export function useNfc() {
     setError(null);
     try {
       const result = await readNfcTag();
-      if (!cancelRequested.current) setTagId(result);
+      if (!cancelRequested.current) {
+        setTagId(result.deviceId);
+        setTagName(result.deviceName);
+      }
     } catch (readError) {
       if (!cancelRequested.current) {
         setError(readError instanceof Error ? readError.message : 'NFC read failed');
@@ -45,6 +50,7 @@ export function useNfc() {
   /** Clears the last tag so a new read starts from a blank slate. */
   const reset = useCallback(() => {
     setTagId(null);
+    setTagName(null);
     setError(null);
   }, []);
 
@@ -85,5 +91,5 @@ export function useNfc() {
     };
   }, []);
 
-  return {tagId, reading, error, readTag, cancel, reset};
+  return {tagId, tagName, reading, error, readTag, cancel, reset};
 }
