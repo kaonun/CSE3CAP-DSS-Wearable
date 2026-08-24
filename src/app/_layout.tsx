@@ -5,7 +5,7 @@ import { ActivityIndicator, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import AppNavigator from '@/components/app-navigator';
 import { Colors } from '@/constants/theme';
 import { I18nProvider, useI18n } from '@/i18n';
 import { ActivityTracker, AuthProvider, useAuth } from '@/auth';
@@ -61,7 +61,7 @@ function AuthGate() {
         <LoginScreen />
       ) : (
         <ActivityTracker>
-          <AppTabs />
+          <AppNavigator />
         </ActivityTracker>
       )}
       <AnimatedSplashOverlay />

@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectSheet } from '@/components/connect-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/surface';
-import { BottomTabInset, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useBleDevice, useNfc } from '@/connectivity';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n } from '@/i18n';
@@ -53,6 +54,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
 export default function WearableScreen() {
   const theme = useTheme();
   const { t } = useI18n();
+  const router = useRouter();
   const ble = useBleDevice();
   const nfc = useNfc();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -83,10 +85,23 @@ export default function WearableScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <ThemedText type="largeTitle">{t.appName}</ThemedText>
-            <ThemedText type="subhead" themeColor="textSecondary">
-              {t.metrics}
-            </ThemedText>
+            <View style={styles.headerText}>
+              <ThemedText type="largeTitle">{t.appName}</ThemedText>
+              <ThemedText type="subhead" themeColor="textSecondary">
+                {t.metrics}
+              </ThemedText>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t.settings}
+              hitSlop={12}
+              onPress={() => router.push('/settings')}
+              style={({ pressed }) => [
+                styles.headerButton,
+                { backgroundColor: theme.fill, opacity: pressed ? 0.6 : 1 },
+              ]}>
+              <Ionicons name="settings-outline" size={20} color={theme.tint} />
+            </Pressable>
           </View>
 
           {/* Live metrics */}
@@ -218,13 +233,28 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: {
     paddingHorizontal: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.five,
+    paddingBottom: Spacing.six,
     gap: Spacing.three,
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
-  header: { paddingTop: Spacing.three, gap: Spacing.half },
+  header: {
+    paddingTop: Spacing.three,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+  },
+  headerText: { flex: 1, gap: Spacing.half },
+  headerButton: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.one,
+  },
   label: { textTransform: 'uppercase', letterSpacing: 0.6 },
 
   hero: { padding: Spacing.four, gap: Spacing.three },
