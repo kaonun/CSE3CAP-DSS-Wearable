@@ -12,9 +12,9 @@ import {
 } from 'firebase/firestore';
 
 import { auth, db } from '@/firebase';
+import { BUCKET_MS } from './constants';
 
-/** Readings are aggregated into buckets of this width before being stored. */
-export const BUCKET_MS = 60_000;
+export { BUCKET_MS };
 
 export type Summary = {
   deviceId: string;

@@ -94,17 +94,30 @@ export default function WearableScreen() {
                 {t.metrics}
               </ThemedText>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t.settings}
-              hitSlop={12}
-              onPress={() => router.push('/settings')}
-              style={({ pressed }) => [
-                styles.headerButton,
-                { backgroundColor: theme.fill, opacity: pressed ? 0.6 : 1 },
-              ]}>
-              <Ionicons name="settings-outline" size={20} color={theme.tint} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.history}
+                hitSlop={10}
+                onPress={() => router.push('/history')}
+                style={({ pressed }) => [
+                  styles.headerButton,
+                  { backgroundColor: theme.fill, opacity: pressed ? 0.6 : 1 },
+                ]}>
+                <Ionicons name="stats-chart-outline" size={19} color={theme.tint} />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.settings}
+                hitSlop={10}
+                onPress={() => router.push('/settings')}
+                style={({ pressed }) => [
+                  styles.headerButton,
+                  { backgroundColor: theme.fill, opacity: pressed ? 0.6 : 1 },
+                ]}>
+                <Ionicons name="settings-outline" size={20} color={theme.tint} />
+              </Pressable>
+            </View>
           </View>
 
           {/* One live card per connected device. */}
@@ -287,6 +300,7 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   headerText: { flex: 1, gap: Spacing.half },
+  headerActions: { flexDirection: 'row', gap: Spacing.two },
   headerButton: {
     width: 38,
     height: 38,
