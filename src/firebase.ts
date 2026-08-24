@@ -18,10 +18,19 @@ export const firebaseConfigured = Object.values(config).every(Boolean);
 
 // Keystore/Keychain-backed persistence — session tokens must never sit in
 // AsyncStorage (see DSS Wearable App security must-dos, Data Storage §2).
+//
+// Firebase's persistence keys look like `firebase:authUser:<apiKey>:[DEFAULT]`
+// (see _persistenceKeyName in firebase/auth), but SecureStore only accepts
+// alphanumeric characters plus ".", "-", "_" and throws on anything else.
+// Left unsanitized, that throw happens inside Firebase's persistence init,
+// before onAuthStateChanged ever fires — auth silently hangs forever with no
+// crash. The mapping only needs to be consistent, not reversible.
+const sanitizeKey = (key: string) => key.replace(/[^A-Za-z0-9._-]/g, '_');
+
 const secureStorePersistence = {
-  getItem: (key: string) => SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+  getItem: (key: string) => SecureStore.getItemAsync(sanitizeKey(key)),
+  setItem: (key: string, value: string) => SecureStore.setItemAsync(sanitizeKey(key), value),
+  removeItem: (key: string) => SecureStore.deleteItemAsync(sanitizeKey(key)),
 };
 
 let auth: Auth | null = null;
