@@ -149,6 +149,22 @@ export function useBleDevice(onReading?: BleReadingHandler) {
     return () => clearTimeout(timer);
   }, [disconnectedNames]);
 
+  /**
+   * Errors clear themselves too. They describe a moment that has passed — a
+   * scan that failed, a connection that dropped — so leaving one pinned to the
+   * screen misrepresents the current state long after it stopped being true.
+   */
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => {
+      setError(null);
+      // 'error' is a terminal status; once the message goes, reflect whatever
+      // is actually connected now.
+      setStatus(current => (current === 'error' ? (connectedIds.current.size ? 'connected' : 'idle') : current));
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
   return {
     status,
     devices,
