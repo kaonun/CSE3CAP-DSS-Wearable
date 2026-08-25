@@ -17,17 +17,22 @@ const MIN_SPAN_BPM = 12;
 
 const TRACE_HEIGHT = 44;
 
-/** A heart that beats once per incoming reading. */
+/** An icon that pulses once per incoming reading — a heart by default. */
 export function BeatingHeart({
   beatKey,
   size = 26,
   idle,
+  icon = 'heart',
+  activeColor,
 }: {
   /** Changes with every new reading; each change triggers one beat. */
   beatKey: number | null;
   size?: number;
   /** Dimmed and still when no readings are arriving. */
   idle?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
+  /** Colour while live. Defaults to the danger red, which suits the heart icon. */
+  activeColor?: string;
 }) {
   const theme = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
@@ -45,9 +50,9 @@ export function BeatingHeart({
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
       <Ionicons
-        name="heart"
+        name={icon}
         size={size}
-        color={idle ? theme.textTertiary : theme.danger}
+        color={idle ? theme.textTertiary : (activeColor ?? theme.danger)}
       />
     </Animated.View>
   );

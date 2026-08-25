@@ -6,5 +6,8 @@ export type {
   ConnectedDevice,
   ConnectionHistoryEntry,
   ConnectionStatus,
+  DeviceCapabilities,
+  MetricKey,
+  MetricReading,
   SensorReading,
 } from './types';

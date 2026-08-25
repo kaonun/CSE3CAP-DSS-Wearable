@@ -1,13 +1,16 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { ActivityIndicator, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppNavigator from '@/components/app-navigator';
 import { Colors } from '@/constants/theme';
+import { ReadingSyncProvider } from '@/data/reading-sync-context';
 import { I18nProvider, useI18n } from '@/i18n';
+import { MetricPreferenceProvider } from '@/metrics';
+import { ThemePreferenceProvider, useThemePreference } from '@/theme-preference';
 import { ActivityTracker, AuthProvider, useAuth } from '@/auth';
 // Lives outside app/ on purpose: the auth gate renders it directly, and any
 // file under app/ is registered as a route and shows up as its own tab.
@@ -16,33 +19,45 @@ import LoginScreen from '@/components/login-screen';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
+      <ThemePreferenceProvider>
         <AuthProvider>
           <I18nProvider>
-            <AuthGate />
+            <MetricPreferenceProvider>
+              <ReadingSyncProvider>
+                <RootTheme />
+              </ReadingSyncProvider>
+            </MetricPreferenceProvider>
           </I18nProvider>
         </AuthProvider>
-      </ThemeProvider>
+      </ThemePreferenceProvider>
     </SafeAreaProvider>
   );
 }
 
+function RootTheme() {
+  const { resolvedScheme } = useThemePreference();
+  const isDark = resolvedScheme === 'dark';
+
+  return (
+    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <AuthGate />
+    </ThemeProvider>
+  );
+}
+
 function AuthGate() {
-  const colorScheme = useColorScheme();
-  const theme = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
+  const { resolvedScheme, loading: themeLoading } = useThemePreference();
+  const theme = Colors[resolvedScheme];
   const { configured, loading: authLoading, user } = useAuth();
   const { loading: languageLoading } = useI18n();
 
-  // Hold the splash until both the session and the language preference resolve,
-  // so the app never flashes English or the login screen at an already-signed-in
-  // user.
-  if ((configured && authLoading) || languageLoading) {
+  // Hold the splash until the session, language and theme preference all
+  // resolve, so the app never flashes English, the wrong theme, or the login
+  // screen at an already-signed-in user.
+  if ((configured && authLoading) || languageLoading || themeLoading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
         <ActivityIndicator color={theme.tint} />

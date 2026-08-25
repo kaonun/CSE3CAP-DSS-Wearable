@@ -16,8 +16,9 @@ const COLUMN_MIN_WIDTH = 3;
  * the min and max seen in that slice, with the average drawn through it. A
  * plain line chart of averages would hide how much the rate actually moved.
  */
-export function HistoryChart({ points }: { points: ChartPoint[] }) {
+export function HistoryChart({ points, color }: { points: ChartPoint[]; color?: string }) {
   const theme = useTheme();
+  const lineColor = color ?? theme.tint;
   const [width, setWidth] = useState(0);
 
   if (points.length === 0) return null;

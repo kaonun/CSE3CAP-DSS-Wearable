@@ -88,8 +88,14 @@ export type Messages = {
   // Settings
   settings: string;
   settingsSubtitle: string;
+  accessibility: string;
   language: string;
   languageDescription: string;
+  theme: string;
+  themeDescription: string;
+  themeLight: string;
+  themeDark: string;
+  themeSystem: string;
   account: string;
   signInPrompt: string;
   about: string;
@@ -117,6 +123,21 @@ export type Messages = {
   deleteDataConfirm: string;
   deleteDataDone: string;
   delete: string;
+  // Metrics
+  metricHeartRate: string;
+  metricCadence: string;
+  metricCalories: string;
+  spm: string;
+  kcal: string;
+  estimated: string;
+  chooseMetrics: string;
+  autoRecommended: string;
+  autoRecommendedHelp: string;
+  metricUnavailable: string;
+  changeMetrics: string;
+  cadenceSensor: string;
+  noMetricsSelected: string;
+  removeMetric: string;
 };
 
 export type Language =

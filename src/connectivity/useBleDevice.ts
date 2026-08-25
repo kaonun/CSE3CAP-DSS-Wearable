@@ -1,19 +1,32 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
+import {estimateCaloriesPerMinute} from './calories';
 import {connectBleDevice, destroyBle, disconnectBleDevice, scanBleDevices, stopBleScan} from './bleService';
 import {
   BleDeviceInfo,
-  BleReadingHandler,
   ConnectedDevice,
   ConnectionHistoryEntry,
   ConnectionStatus,
+  DeviceCapabilities,
   DiscoverySource,
+  MetricKey,
+  MetricReading,
   SensorReading,
 } from './types';
 
-/** How many readings each device keeps for its sparkline. */
+/** How many readings each device/metric keeps for its sparkline. */
 const TRACE_LENGTH = 24;
 
-export function useBleDevice(onReading?: BleReadingHandler) {
+const NO_CAPABILITIES: DeviceCapabilities = {heartRate: false, cadence: false, calories: false};
+
+function emptyReadings(): Record<MetricKey, number | null> {
+  return {heartRate: null, cadence: null, calories: null};
+}
+
+function emptyHistory(): Record<MetricKey, number[]> {
+  return {heartRate: [], cadence: [], calories: []};
+}
+
+export function useBleDevice(onReading?: (reading: MetricReading) => void) {
   const [status, setStatus] = useState<ConnectionStatus>('idle');
   const [devices, setDevices] = useState<BleDeviceInfo[]>([]);
   // One entry per live connection. The BLE service already supports several
@@ -36,6 +49,13 @@ export function useBleDevice(onReading?: BleReadingHandler) {
   devicesRef.current = devices;
   const connectedRef = useRef<ConnectedDevice[]>([]);
   connectedRef.current = connectedDevices;
+  // Running sum/count per device, used to average heart rate for the calorie
+  // estimate rather than reacting to every single noisy reading.
+  const heartRateAccumulator = useRef(new Map<string, {sum: number; count: number}>());
+  // Capabilities arrive mid-connection, before the device's entry exists in
+  // connectedDevices — stashed here so the entry can be created with them
+  // already in place instead of the connect/error-prone NO_CAPABILITIES.
+  const pendingCapabilities = useRef(new Map<string, DeviceCapabilities>());
 
   useEffect(() => () => {
     stopBleScan();
@@ -82,41 +102,85 @@ export function useBleDevice(onReading?: BleReadingHandler) {
     setStatus('connecting');
     setError(null);
     setConnectingDeviceId(deviceId);
+    heartRateAccumulator.current.delete(deviceId);
+    pendingCapabilities.current.delete(deviceId);
     try {
-      await connectBleDevice(deviceId, (reading: SensorReading) => {
-        if (reading.metric === 'heartRate') {
+      await connectBleDevice(
+        deviceId,
+        (reading: SensorReading) => {
+          // Calories is derived, not read — recomputed from a running average
+          // of heart rate each time a new heart-rate value lands. The
+          // accumulator is a ref mutation, so it must happen outside the
+          // state updater below, which React may invoke more than once.
+          let derivedCalories: number | null = null;
+          if (reading.metric === 'heartRate') {
+            const accumulator = heartRateAccumulator.current.get(reading.deviceId) ?? {sum: 0, count: 0};
+            accumulator.sum += reading.value;
+            accumulator.count += 1;
+            heartRateAccumulator.current.set(reading.deviceId, accumulator);
+            const averageHeartRate = accumulator.sum / accumulator.count;
+            const elapsedMinutes = accumulator.count / 60;
+            derivedCalories = Math.round(estimateCaloriesPerMinute(averageHeartRate) * elapsedMinutes);
+          }
+
+          setConnectedDevices(current =>
+            current.map(device => {
+              if (device.id !== reading.deviceId) return device;
+
+              const readings = {...device.readings, [reading.metric]: reading.value};
+              const history = {
+                ...device.history,
+                [reading.metric]: [...device.history[reading.metric], reading.value].slice(-TRACE_LENGTH),
+              };
+
+              if (derivedCalories !== null) {
+                readings.calories = derivedCalories;
+                history.calories = [...device.history.calories, derivedCalories].slice(-TRACE_LENGTH);
+              }
+
+              return {...device, readings, history, updatedAt: reading.timestamp};
+            }),
+          );
+
+          callbackRef.current?.(reading);
+          if (derivedCalories !== null) {
+            callbackRef.current?.({
+              metric: 'calories',
+              value: derivedCalories,
+              deviceId: reading.deviceId,
+              timestamp: reading.timestamp,
+            });
+          }
+        },
+        connectError => {
+          connectedIds.current.delete(deviceId);
+          setConnectedDevices(current => current.filter(device => device.id !== deviceId));
+          closeHistoryEntry(deviceId);
+          setError(connectError.message);
+          setStatus(connectedIds.current.size ? 'connected' : 'error');
+        },
+        resolvedName => {
+          // A name read over GATT after connecting, for peripherals that do not
+          // advertise one. Update both the live card and the history entry.
           setConnectedDevices(current =>
             current.map(device =>
-              device.id === reading.deviceId
-                ? {
-                    ...device,
-                    heartRate: reading.value,
-                    history: [...device.history, reading.value].slice(-TRACE_LENGTH),
-                    updatedAt: reading.timestamp,
-                  }
-                : device,
+              device.id === deviceId ? {...device, name: resolvedName} : device,
             ),
           );
-        }
-        callbackRef.current?.(reading);
-      }, connectError => {
-        connectedIds.current.delete(deviceId);
-        setConnectedDevices(current => current.filter(device => device.id !== deviceId));
-        closeHistoryEntry(deviceId);
-        setError(connectError.message);
-        setStatus(connectedIds.current.size ? 'connected' : 'error');
-      }, resolvedName => {
-        // A name read over GATT after connecting, for peripherals that do not
-        // advertise one. Update both the live card and the history entry.
-        setConnectedDevices(current =>
-          current.map(device =>
-            device.id === deviceId ? {...device, name: resolvedName} : device,
-          ),
-        );
-        setConnectionHistory(current =>
-          current.map(entry => (entry.id === deviceId ? {...entry, name: resolvedName} : entry)),
-        );
-      });
+          setConnectionHistory(current =>
+            current.map(entry => (entry.id === deviceId ? {...entry, name: resolvedName} : entry)),
+          );
+        },
+        capabilities => {
+          // This fires mid-connection, before the device below has been added
+          // to state — stash it here as well so the entry starts correct
+          // rather than waiting on this map to find a match that isn't there yet.
+          pendingCapabilities.current.set(deviceId, capabilities);
+          setConnectedDevices(current =>
+            current.map(device => (device.id === deviceId ? {...device, capabilities} : device)),
+          );
+        },
+      );
 
       connectedIds.current.add(deviceId);
       // Null name when the peripheral never advertised one, or when the device
@@ -130,7 +194,17 @@ export function useBleDevice(onReading?: BleReadingHandler) {
       setConnectedDevices(current =>
         current.some(device => device.id === deviceId)
           ? current
-          : [...current, {id: deviceId, name, heartRate: null, history: [], updatedAt: null}],
+          : [
+              ...current,
+              {
+                id: deviceId,
+                name,
+                capabilities: pendingCapabilities.current.get(deviceId) ?? NO_CAPABILITIES,
+                readings: emptyReadings(),
+                history: emptyHistory(),
+                updatedAt: null,
+              },
+            ],
       );
       setConnectionHistory(current => [
         {id: deviceId, name, connectedAt: Date.now(), disconnectedAt: null, via},
@@ -162,6 +236,14 @@ export function useBleDevice(onReading?: BleReadingHandler) {
     setConnectedDevices(current =>
       deviceId ? current.filter(device => device.id !== deviceId) : [],
     );
+
+    if (deviceId) {
+      heartRateAccumulator.current.delete(deviceId);
+      pendingCapabilities.current.delete(deviceId);
+    } else {
+      heartRateAccumulator.current.clear();
+      pendingCapabilities.current.clear();
+    }
 
     disconnectBleDevice(deviceId);
     closeHistoryEntry(deviceId);

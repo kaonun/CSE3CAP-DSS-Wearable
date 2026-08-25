@@ -13,24 +13,28 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // Mirrors the client-side bounds in src/connectivity/heartRate.ts so a
+    // Mirrors the client-side bounds in src/connectivity/heartRate.ts,
+    // src/connectivity/cadence.ts and src/connectivity/calories.ts so a
     // compromised or modified client cannot store implausible readings.
-    function isValidHeartRate(value) {
-      return value is int && value > 0 && value <= 300;
+    function isValidMetricValue(metric, value) {
+      return (metric == 'heartRate' && value is int && value > 0 && value <= 300)
+        || (metric == 'cadence' && value is int && value >= 0 && value <= 254)
+        // Calories is an estimate, never a raw sensor bound — generously capped.
+        || (metric == 'calories' && value is int && value >= 0 && value <= 100);
     }
 
     function isValidSummary(data) {
       return data.keys().hasAll(['deviceId', 'metric', 'bucketStart', 'min', 'max', 'avg', 'count'])
         && data.keys().hasOnly(['deviceId', 'deviceName', 'metric', 'bucketStart', 'min', 'max', 'avg', 'count', 'createdAt'])
-        && data.metric == 'heartRate'
+        && data.metric in ['heartRate', 'cadence', 'calories']
         && data.deviceId is string
         && data.deviceId.size() > 0
         && data.deviceId.size() <= 128
         && (!('deviceName' in data.keys()) || data.deviceName == null || data.deviceName is string)
         && data.bucketStart is timestamp
-        && isValidHeartRate(data.min)
-        && isValidHeartRate(data.max)
-        && isValidHeartRate(data.avg)
+        && isValidMetricValue(data.metric, data.min)
+        && isValidMetricValue(data.metric, data.max)
+        && isValidMetricValue(data.metric, data.avg)
         && data.min <= data.avg
         && data.avg <= data.max
         && data.count is int

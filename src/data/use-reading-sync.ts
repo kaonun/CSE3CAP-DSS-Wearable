@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import type { SensorReading } from '@/connectivity';
+import type { MetricReading } from '@/connectivity';
 import {
   BUCKET_MS,
   bucketKey,
@@ -45,11 +45,9 @@ export function useReadingSync() {
     names.current.set(deviceId, name);
   }, []);
 
-  const record = useCallback((reading: SensorReading) => {
-    if (reading.metric !== 'heartRate') return;
-
+  const record = useCallback((reading: MetricReading) => {
     const bucketStart = bucketStartFor(reading.timestamp);
-    const key = bucketKey(reading.deviceId, bucketStart);
+    const key = bucketKey(reading.deviceId, reading.metric, bucketStart);
     const existing = buckets.current.get(key);
 
     if (existing) {
@@ -61,6 +59,7 @@ export function useReadingSync() {
       buckets.current.set(key, {
         deviceId: reading.deviceId,
         deviceName: names.current.get(reading.deviceId) ?? null,
+        metric: reading.metric,
         bucketStart,
         min: reading.value,
         max: reading.value,

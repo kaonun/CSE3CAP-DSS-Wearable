@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HistoryChart } from '@/components/history-chart';
@@ -15,18 +15,32 @@ import {
   toChartPoints,
   type RangeKey,
 } from '@/data/analytics';
+import { useReadingSyncContext } from '@/data/reading-sync-context';
 import { fetchSummaries, type Summary } from '@/data/summaries';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n } from '@/i18n';
+import { METRIC_INFO, METRIC_ORDER, metricColor, type MetricKey } from '@/metrics';
 
-function StatTile({ label, value, unit }: { label: string; value: string; unit?: string }) {
+function StatTile({
+  label,
+  value,
+  unit,
+  color,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  color?: string;
+}) {
   return (
     <View style={styles.statTile}>
       <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
         {label}
       </ThemedText>
       <View style={styles.statValueRow}>
-        <ThemedText type="title2">{value}</ThemedText>
+        <ThemedText type="title2" style={color ? { color } : undefined}>
+          {value}
+        </ThemedText>
         {unit ? (
           <ThemedText type="footnote" themeColor="textTertiary">
             {unit}
@@ -41,8 +55,10 @@ export default function HistoryScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { t } = useI18n();
+  const sync = useReadingSyncContext();
 
   const [range, setRange] = useState<RangeKey>('today');
+  const [metric, setMetric] = useState<MetricKey>('heartRate');
   const [summaries, setSummaries] = useState<Summary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,11 +67,15 @@ export default function HistoryScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
+      // Force out whatever is still buffered locally first — otherwise a
+      // device connected moments ago shows nothing, since a bucket only
+      // writes itself once its minute closes on its own.
+      await sync.flush(true);
       setSummaries(await fetchSummaries());
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : t.errGeneric);
     }
-  }, [t]);
+  }, [t, sync.flush]);
 
   useEffect(() => {
     let active = true;
@@ -68,10 +88,31 @@ export default function HistoryScreen() {
     };
   }, [load]);
 
-  const inRange = useMemo(() => filterByRange(summaries, range), [summaries, range]);
+  // Different metrics are not comparable (bpm vs steps/min vs kcal), so stats
+  // and the chart only ever look at one metric at a time.
+  const availableMetrics = useMemo(
+    () => METRIC_ORDER.filter(candidate => summaries.some(summary => summary.metric === candidate)),
+    [summaries],
+  );
+
+  // Keep the selection pinned to a metric that actually has data.
+  useEffect(() => {
+    if (availableMetrics.length > 0 && !availableMetrics.includes(metric)) {
+      setMetric(availableMetrics[0]);
+    }
+  }, [availableMetrics, metric]);
+
+  const metricSummaries = useMemo(
+    () => summaries.filter(summary => summary.metric === metric),
+    [summaries, metric],
+  );
+
+  const inRange = useMemo(() => filterByRange(metricSummaries, range), [metricSummaries, range]);
   const stats = useMemo(() => computeStats(inRange), [inRange]);
   const points = useMemo(() => toChartPoints(inRange, range), [inRange, range]);
   const contributors = useMemo(() => devicesIn(inRange), [inRange]);
+  const unit = t[METRIC_INFO[metric].unitKey];
+  const color = metricColor(metric, theme);
 
   const ranges: { key: RangeKey; label: string }[] = [
     { key: 'today', label: t.rangeToday },
@@ -112,6 +153,35 @@ export default function HistoryScreen() {
               {t.historySubtitle}
             </ThemedText>
           </View>
+
+          {/* Only worth choosing between metrics once more than one has data. */}
+          {availableMetrics.length > 1 ? (
+            <View style={styles.metricChips}>
+              {availableMetrics.map(option => {
+                const selected = option === metric;
+                const info = METRIC_INFO[option];
+                return (
+                  <Pressable
+                    key={option}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => setMetric(option)}
+                    style={[
+                      styles.metricChip,
+                      { borderColor: theme.separator },
+                      selected && { backgroundColor: theme.tint, borderColor: theme.tint },
+                    ]}>
+                    <Text style={styles.metricChipEmoji}>{info.emoji}</Text>
+                    <ThemedText
+                      type="footnote"
+                      style={{ color: selected ? theme.tintContrast : theme.textSecondary }}>
+                      {t[info.labelKey]}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
 
           {/* Range selector, styled after the iOS segmented control. */}
           <View style={[styles.segmented, { backgroundColor: theme.fill }]}>
@@ -161,21 +231,25 @@ export default function HistoryScreen() {
           ) : (
             <>
               <Card style={styles.chartCard}>
-                <HistoryChart points={points} />
+                <View style={styles.chartHeader}>
+                  <Text style={styles.chartHeaderEmoji}>{METRIC_INFO[metric].emoji}</Text>
+                  <ThemedText type="headline">{t[METRIC_INFO[metric].labelKey]}</ThemedText>
+                </View>
+                <HistoryChart points={points} color={color} />
               </Card>
 
               <View style={styles.statGrid}>
                 <Card style={styles.statCard}>
-                  <StatTile label={t.average} value={show(stats.average)} unit={t.bpm} />
+                  <StatTile label={t.average} value={show(stats.average)} unit={unit} color={color} />
                 </Card>
                 <Card style={styles.statCard}>
-                  <StatTile label={t.resting} value={show(stats.resting)} unit={t.bpm} />
+                  <StatTile label={t.resting} value={show(stats.resting)} unit={unit} />
                 </Card>
                 <Card style={styles.statCard}>
-                  <StatTile label={t.minimum} value={show(stats.minimum)} unit={t.bpm} />
+                  <StatTile label={t.minimum} value={show(stats.minimum)} unit={unit} />
                 </Card>
                 <Card style={styles.statCard}>
-                  <StatTile label={t.maximum} value={show(stats.maximum)} unit={t.bpm} />
+                  <StatTile label={t.maximum} value={show(stats.maximum)} unit={unit} />
                 </Card>
               </View>
 
@@ -248,6 +322,18 @@ const styles = StyleSheet.create({
   },
   header: { gap: Spacing.half },
 
+  metricChips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  metricChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one + 2,
+    borderRadius: Radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  metricChipEmoji: { fontSize: 14 },
+
   segmented: { flexDirection: 'row', borderRadius: Radius.sm, padding: 2 },
   segment: {
     flex: 1,
@@ -268,7 +354,9 @@ const styles = StyleSheet.create({
   },
   emptyCard: { alignItems: 'center', gap: Spacing.two, padding: Spacing.five },
 
-  chartCard: { padding: Spacing.three },
+  chartCard: { padding: Spacing.three, gap: Spacing.two },
+  chartHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  chartHeaderEmoji: { fontSize: 18 },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   statCard: { flexGrow: 1, flexBasis: '47%', padding: Spacing.three },
   statTile: { gap: Spacing.half },

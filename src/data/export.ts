@@ -14,9 +14,9 @@ const HEADERS = [
   'device_id',
   'device_name',
   'metric',
-  'min_bpm',
-  'avg_bpm',
-  'max_bpm',
+  'min_value',
+  'avg_value',
+  'max_value',
   'sample_count',
 ] as const;
 

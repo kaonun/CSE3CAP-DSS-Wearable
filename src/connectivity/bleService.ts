@@ -1,9 +1,10 @@
 import {Platform} from 'react-native';
 import {toByteArray} from 'base64-js';
 import {requestBlePermissions} from './permissions';
+import {CADENCE_MEASUREMENT_UUID, CADENCE_SERVICE_UUID, decodeCadenceMeasurement} from './cadence';
 import {decodeHeartRateMeasurement, HEART_RATE_MEASUREMENT_UUID, HEART_RATE_SERVICE_UUID} from './heartRate';
 import {mockConnect, mockDisconnect, mockScan} from './mock';
-import {BleDeviceInfo, BleReadingHandler} from './types';
+import {BleDeviceInfo, BleReadingHandler, capabilitiesFromServices, DeviceCapabilities} from './types';
 
 type ErrorHandler = (error: Error) => void;
 
@@ -20,6 +21,7 @@ type ConnectedPeripheral = {
   localName?: string | null;
   discoverAllServicesAndCharacteristics: () => Promise<unknown>;
   cancelConnection: () => Promise<unknown>;
+  services: () => Promise<{uuid: string}[]>;
   readCharacteristicForService?: (
     service: string,
     characteristic: string,
@@ -109,9 +111,9 @@ export function mergeScanResult(
   packet: ScannedDevice,
 ): BleDeviceInfo {
   const advertised = (packet.name ?? packet.localName)?.trim() || null;
-  const advertisesHeartRate = (packet.serviceUUIDs ?? []).some(
-    uuid => uuid.toLowerCase() === HEART_RATE_SERVICE_UUID.toLowerCase(),
-  );
+  const advertisedUuids = (packet.serviceUUIDs ?? []).map(uuid => uuid.toLowerCase());
+  const advertisesHeartRate = advertisedUuids.includes(HEART_RATE_SERVICE_UUID.toLowerCase());
+  const advertisesCadence = advertisedUuids.includes(CADENCE_SERVICE_UUID.toLowerCase());
 
   return {
     id: packet.id,
@@ -120,6 +122,7 @@ export function mergeScanResult(
     rssi: typeof packet.rssi === 'number' ? packet.rssi : (existing?.rssi ?? null),
     // Once a device has advertised the service, it has the service.
     advertisesHeartRate: advertisesHeartRate || !!existing?.advertisesHeartRate,
+    advertisesCadence: advertisesCadence || !!existing?.advertisesCadence,
   };
 }
 
@@ -190,9 +193,11 @@ export async function connectBleDevice(
   onError: ErrorHandler,
   /** Called with a name resolved over GATT, when the scan produced none. */
   onName?: (name: string) => void,
+  /** Called once with what the device's real, discovered GATT services support. */
+  onCapabilities?: (capabilities: DeviceCapabilities) => void,
 ): Promise<void> {
   if (!/^[A-Za-z0-9:_-]{1,128}$/.test(deviceId)) throw new Error('Invalid device identifier');
-  if (isMockMode) return mockConnect(deviceId, onReading);
+  if (isMockMode) return mockConnect(deviceId, onReading, onCapabilities);
   if (!(await requestBlePermissions())) throw new Error('Bluetooth permissions were not granted');
   stopBleScan();
   if (connections.has(deviceId)) return;
@@ -203,11 +208,11 @@ export async function connectBleDevice(
   // connection down. The second attempt succeeds because the first populated
   // the cache. Retrying here spares the user from having to tap twice.
   try {
-    await attemptConnection(deviceId, onReading, onError, onName);
+    await attemptConnection(deviceId, onReading, onError, onName, onCapabilities);
   } catch (firstError) {
     await delay(RETRY_DELAY_MS);
     try {
-      await attemptConnection(deviceId, onReading, onError, onName);
+      await attemptConnection(deviceId, onReading, onError, onName, onCapabilities);
     } catch {
       // Report the original failure — it describes why the device refused.
       throw firstError;
@@ -227,6 +232,7 @@ async function attemptConnection(
   onReading: BleReadingHandler,
   onError: ErrorHandler,
   onName?: (name: string) => void,
+  onCapabilities?: (capabilities: DeviceCapabilities) => void,
 ): Promise<void> {
   if (connections.has(deviceId)) return;
 
@@ -234,22 +240,59 @@ async function attemptConnection(
   try {
     await device.discoverAllServicesAndCharacteristics();
 
-    const characteristicSubscription = device.monitorCharacteristicForService(
-      HEART_RATE_SERVICE_UUID,
-      HEART_RATE_MEASUREMENT_UUID,
-      (error, characteristic) => {
-        if (error) {
-          if (!intentionalDisconnects.has(deviceId)) onError(error);
-          return;
-        }
-        if (!characteristic?.value) return;
-        try {
-          onReading({metric: 'heartRate', value: decodeHeartRateMeasurement(characteristic.value), deviceId, timestamp: Date.now()});
-        } catch (decodeError) {
-          onError(decodeError instanceof Error ? decodeError : new Error('Invalid sensor payload'));
-        }
-      },
-    );
+    // Capability is read off what the device actually discovered, not the
+    // advertisement — a device connected via an NFC tag never went through a
+    // scan, so advertised service UUIDs are not always available.
+    const discovered = await device.services().catch(() => [] as {uuid: string}[]);
+    const discoveredUuids = discovered.map(service => service.uuid.toLowerCase());
+    const hasHeartRate = discoveredUuids.includes(HEART_RATE_SERVICE_UUID.toLowerCase());
+    const hasCadence = discoveredUuids.includes(CADENCE_SERVICE_UUID.toLowerCase());
+    onCapabilities?.(capabilitiesFromServices({heartRate: hasHeartRate, cadence: hasCadence}));
+
+    const subscriptions: {remove: () => void}[] = [];
+
+    if (hasHeartRate) {
+      subscriptions.push(
+        device.monitorCharacteristicForService(
+          HEART_RATE_SERVICE_UUID,
+          HEART_RATE_MEASUREMENT_UUID,
+          (error, characteristic) => {
+            if (error) {
+              if (!intentionalDisconnects.has(deviceId)) onError(error);
+              return;
+            }
+            if (!characteristic?.value) return;
+            try {
+              onReading({metric: 'heartRate', value: decodeHeartRateMeasurement(characteristic.value), deviceId, timestamp: Date.now()});
+            } catch (decodeError) {
+              onError(decodeError instanceof Error ? decodeError : new Error('Invalid sensor payload'));
+            }
+          },
+        ),
+      );
+    }
+
+    if (hasCadence) {
+      subscriptions.push(
+        device.monitorCharacteristicForService(
+          CADENCE_SERVICE_UUID,
+          CADENCE_MEASUREMENT_UUID,
+          (error, characteristic) => {
+            if (error) {
+              if (!intentionalDisconnects.has(deviceId)) onError(error);
+              return;
+            }
+            if (!characteristic?.value) return;
+            try {
+              onReading({metric: 'cadence', value: decodeCadenceMeasurement(characteristic.value), deviceId, timestamp: Date.now()});
+            } catch (decodeError) {
+              onError(decodeError instanceof Error ? decodeError : new Error('Invalid sensor payload'));
+            }
+          },
+        ),
+      );
+    }
+
     const disconnectSubscription = device.onDisconnected(error => {
       connections.get(deviceId)?.remove();
       connections.delete(deviceId);
@@ -259,7 +302,7 @@ async function attemptConnection(
     });
     connections.set(deviceId, {
       device,
-      remove: () => {characteristicSubscription.remove(); disconnectSubscription.remove();},
+      remove: () => {subscriptions.forEach(subscription => subscription.remove()); disconnectSubscription.remove();},
     });
 
     // Deliberately after the subscription is live, and deliberately not

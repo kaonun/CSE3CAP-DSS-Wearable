@@ -7,31 +7,42 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LanguagePicker } from '@/components/language-picker';
 import { ThemedText } from '@/components/themed-text';
+import { ThemePicker } from '@/components/theme-picker';
 import { ListRow } from '@/components/ui/list-row';
 import { Section } from '@/components/ui/surface';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { useReadingSyncContext } from '@/data/reading-sync-context';
 import { exportSummariesToCsv } from '@/data/export';
 import { deleteAllSummaries } from '@/data/summaries';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n } from '@/i18n';
+import { useThemePreference } from '@/theme-preference';
 import { useAuth } from '@/auth';
 
 export default function SettingsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { language, languages, t } = useI18n();
+  const { preference: themePreference } = useThemePreference();
   const { user, configured, logOut } = useAuth();
+  const sync = useReadingSyncContext();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [themePickerOpen, setThemePickerOpen] = useState(false);
   const [busy, setBusy] = useState<'export' | 'delete' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const current = languages.find(item => item.code === language);
+  const themeValue =
+    themePreference === 'light' ? t.themeLight : themePreference === 'dark' ? t.themeDark : t.themeSystem;
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
 
   const runExport = async () => {
     setBusy('export');
     setNotice(null);
     try {
+      // Otherwise a device connected moments ago has nothing to export yet —
+      // its data is still sitting in the in-memory buffer, not Firestore.
+      await sync.flush(true);
       const result = await exportSummariesToCsv();
       setNotice(
         result.status === 'empty'
@@ -90,13 +101,22 @@ export default function SettingsScreen() {
             </ThemedText>
           </View>
 
-          <Section header={t.language} footer={t.languageDescription}>
+          <Section header={t.accessibility}>
             <ListRow
               title={t.language}
+              subtitle={t.languageDescription}
               value={current?.nativeName}
               icon="language"
               iconBackground={theme.tint}
               onPress={() => setPickerOpen(true)}
+            />
+            <ListRow
+              title={t.theme}
+              subtitle={t.themeDescription}
+              value={themeValue}
+              icon="contrast"
+              iconBackground={theme.tint}
+              onPress={() => setThemePickerOpen(true)}
               separator={false}
             />
           </Section>
@@ -158,6 +178,7 @@ export default function SettingsScreen() {
       </SafeAreaView>
 
       <LanguagePicker visible={pickerOpen} onClose={() => setPickerOpen(false)} />
+      <ThemePicker visible={themePickerOpen} onClose={() => setThemePickerOpen(false)} />
     </View>
   );
 }

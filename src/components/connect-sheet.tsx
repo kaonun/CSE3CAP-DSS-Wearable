@@ -341,6 +341,14 @@ function DeviceRow({
                 </ThemedText>
               </View>
             ) : null}
+            {device.advertisesCadence ? (
+              <View style={[styles.badge, { backgroundColor: `${theme.tint}22` }]}>
+                <Ionicons name="walk" size={10} color={theme.tint} />
+                <ThemedText type="caption" style={{ color: theme.tint }}>
+                  {t.cadenceSensor}
+                </ThemedText>
+              </View>
+            ) : null}
           </View>
 
           {/* The address is always shown — for peripherals that advertise no
