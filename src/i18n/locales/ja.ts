@@ -33,6 +33,7 @@ export const ja: Messages = {
   errNetwork: 'ネットワークに接続できません。接続を確認してください。',
   errGeneric: '問題が発生しました。もう一度お試しください。',
   errEmptyFields: 'メールアドレスとパスワードを入力してください。',
+  errGoogleUnavailable: 'この端末では Google Play 開発者サービスを利用できません。',
 
   wearable: 'デバイス',
   homeSubtitle: 'ライブ接続をシンプルに表示します。',

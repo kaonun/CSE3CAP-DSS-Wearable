@@ -33,6 +33,7 @@ export const id: Messages = {
   errNetwork: 'Jaringan tidak tersedia. Periksa koneksi Anda.',
   errGeneric: 'Terjadi kesalahan. Silakan coba lagi.',
   errEmptyFields: 'Masukkan email dan kata sandi Anda.',
+  errGoogleUnavailable: 'Layanan Google Play tidak tersedia di perangkat ini.',
 
   wearable: 'Perangkat',
   homeSubtitle: 'Tampilan ringkas dari koneksi langsung Anda.',

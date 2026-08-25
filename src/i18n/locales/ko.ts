@@ -33,6 +33,7 @@ export const ko: Messages = {
   errNetwork: '네트워크를 사용할 수 없습니다. 연결을 확인하세요.',
   errGeneric: '문제가 발생했습니다. 다시 시도해 주세요.',
   errEmptyFields: '이메일과 비밀번호를 입력하세요.',
+  errGoogleUnavailable: '이 기기에서는 Google Play 서비스를 사용할 수 없습니다.',
 
   wearable: '기기',
   homeSubtitle: '실시간 연결을 간결하게 보여줍니다.',

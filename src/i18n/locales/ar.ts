@@ -33,6 +33,7 @@ export const ar: Messages = {
   errNetwork: 'الشبكة غير متاحة. تحقق من اتصالك.',
   errGeneric: 'حدث خطأ ما. يرجى المحاولة مرة أخرى.',
   errEmptyFields: 'أدخل بريدك الإلكتروني وكلمة المرور.',
+  errGoogleUnavailable: 'خدمات Google Play غير متوفرة على هذا الجهاز.',
 
   wearable: 'الجهاز',
   homeSubtitle: 'عرض هادئ لاتصالك المباشر.',

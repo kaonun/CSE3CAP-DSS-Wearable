@@ -33,6 +33,7 @@ export const de: Messages = {
   errNetwork: 'Kein Netzwerk. Überprüfe deine Verbindung.',
   errGeneric: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
   errEmptyFields: 'Gib deine E-Mail und dein Passwort ein.',
+  errGoogleUnavailable: 'Google Play-Dienste sind auf diesem Gerät nicht verfügbar.',
 
   wearable: 'Gerät',
   homeSubtitle: 'Eine ruhige Ansicht deiner Live-Verbindung.',

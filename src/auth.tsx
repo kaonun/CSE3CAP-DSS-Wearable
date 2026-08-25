@@ -18,10 +18,39 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 import { AppState, View } from 'react-native';
 
 import { auth, firebaseConfigured } from '@/firebase';
 import type { Messages } from '@/i18n';
+
+/**
+ * Google's native sign-in, configured once at module load.
+ *
+ * The browser-based flow this replaced (expo-auth-session) is refused by
+ * Google for native apps — "doesn't comply with Google's OAuth 2.0 policy" —
+ * because it hands credentials through a web view rather than the platform's
+ * own account picker.
+ *
+ * webClientId is what makes Google return an idToken, which is the thing
+ * Firebase needs; the Android client is matched by package name and signing
+ * certificate rather than being passed here.
+ */
+const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+
+export const googleSignInConfigured = Boolean(googleWebClientId);
+
+if (googleSignInConfigured) {
+  GoogleSignin.configure({
+    webClientId: googleWebClientId,
+    iosClientId: googleIosClientId,
+  });
+}
 
 /** Error keys that map onto translated strings in `Messages`. */
 export type AuthErrorKey = Extract<
@@ -34,6 +63,7 @@ export type AuthErrorKey = Extract<
   | 'errNetwork'
   | 'errGeneric'
   | 'errEmptyFields'
+  | 'errGoogleUnavailable'
 >;
 
 export class AuthError extends Error {
@@ -85,7 +115,8 @@ type AuthValue = {
   register: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logOut: () => Promise<void>;
-  signInWithGoogle: (idToken: string, accessToken?: string) => Promise<void>;
+  /** Runs the whole native Google flow. Resolves false if the user backed out. */
+  signInWithGoogle: () => Promise<boolean>;
   markActivity: () => void;
 };
 
@@ -166,14 +197,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
       logOut: async () => {
+        // Sign out of Google too, otherwise its picker silently reuses the
+        // previous account and "sign out" appears not to have worked.
+        if (googleSignInConfigured) {
+          await GoogleSignin.signOut().catch(() => undefined);
+        }
         if (auth) await signOut(auth).catch(() => undefined);
       },
-      signInWithGoogle: async (idToken, accessToken) => {
-        if (!auth) throw new AuthError('errGeneric');
+      signInWithGoogle: async () => {
+        if (!auth || !googleSignInConfigured) throw new AuthError('errGeneric');
         try {
-          await signInWithCredential(auth, GoogleAuthProvider.credential(idToken, accessToken));
+          // Android only; resolves immediately elsewhere.
+          await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+          const response = await GoogleSignin.signIn();
+          // Backing out of the account picker is a choice, not a failure, so it
+          // returns rather than throwing and does not raise an error banner.
+          if (response.type !== 'success') return false;
+
+          const idToken = response.data?.idToken;
+          if (!idToken) throw new AuthError('errGeneric');
+
+          await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
           lastActivity.current = Date.now();
+          return true;
         } catch (error) {
+          if (isErrorWithCode(error)) {
+            switch (error.code) {
+              case statusCodes.SIGN_IN_CANCELLED:
+                return false;
+              case statusCodes.IN_PROGRESS:
+                // A second tap while the picker is already open.
+                return false;
+              case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+                throw new AuthError('errGoogleUnavailable');
+            }
+          }
+          if (error instanceof AuthError) throw error;
           throw toAuthError(error);
         }
       },

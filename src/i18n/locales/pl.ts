@@ -33,6 +33,7 @@ export const pl: Messages = {
   errNetwork: 'Brak sieci. Sprawdź połączenie.',
   errGeneric: 'Coś poszło nie tak. Spróbuj ponownie.',
   errEmptyFields: 'Podaj e-mail i hasło.',
+  errGoogleUnavailable: 'Usługi Google Play są niedostępne na tym urządzeniu.',
 
   wearable: 'Urządzenie',
   homeSubtitle: 'Spokojny widok Twojego połączenia na żywo.',

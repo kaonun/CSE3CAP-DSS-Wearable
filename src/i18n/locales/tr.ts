@@ -33,6 +33,7 @@ export const tr: Messages = {
   errNetwork: 'Ağ kullanılamıyor. Bağlantınızı kontrol edin.',
   errGeneric: 'Bir sorun oluştu. Lütfen tekrar deneyin.',
   errEmptyFields: 'E-posta ve parolanızı girin.',
+  errGoogleUnavailable: 'Bu cihazda Google Play hizmetleri kullanılamıyor.',
 
   wearable: 'Cihaz',
   homeSubtitle: 'Canlı bağlantınızın sade bir görünümü.',

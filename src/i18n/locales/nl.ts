@@ -33,6 +33,7 @@ export const nl: Messages = {
   errNetwork: 'Geen netwerk. Controleer je verbinding.',
   errGeneric: 'Er ging iets mis. Probeer het opnieuw.',
   errEmptyFields: 'Voer je e-mailadres en wachtwoord in.',
+  errGoogleUnavailable: 'Google Play-services zijn niet beschikbaar op dit apparaat.',
 
   wearable: 'Apparaat',
   homeSubtitle: 'Een rustig overzicht van je live verbinding.',

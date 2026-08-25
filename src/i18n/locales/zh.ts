@@ -33,6 +33,7 @@ export const zh: Messages = {
   errNetwork: '网络不可用，请检查您的连接。',
   errGeneric: '出现问题，请重试。',
   errEmptyFields: '请输入电子邮件和密码。',
+  errGoogleUnavailable: '此设备上无法使用 Google Play 服务。',
 
   wearable: '设备',
   homeSubtitle: '简洁查看您的实时连接。',

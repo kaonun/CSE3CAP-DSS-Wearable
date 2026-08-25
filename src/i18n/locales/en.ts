@@ -34,6 +34,7 @@ export const en: Messages = {
   errNetwork: 'Network unavailable. Check your connection.',
   errGeneric: 'Something went wrong. Please try again.',
   errEmptyFields: 'Enter your email and password.',
+  errGoogleUnavailable: 'Google Play services are unavailable on this device.',
 
   wearable: 'Wearable',
   homeSubtitle: 'A quiet view of your live connection.',

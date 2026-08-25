@@ -33,6 +33,7 @@ export const pt: Messages = {
   errNetwork: 'Rede indisponível. Verifique a sua ligação.',
   errGeneric: 'Algo correu mal. Tente novamente.',
   errEmptyFields: 'Introduza o seu e-mail e palavra-passe.',
+  errGoogleUnavailable: 'Os serviços do Google Play não estão disponíveis neste dispositivo.',
 
   wearable: 'Dispositivo',
   homeSubtitle: 'Uma vista simples da sua ligação em direto.',

@@ -33,6 +33,7 @@ export const vi: Messages = {
   errNetwork: 'Không có mạng. Kiểm tra kết nối của bạn.',
   errGeneric: 'Đã xảy ra lỗi. Vui lòng thử lại.',
   errEmptyFields: 'Nhập email và mật khẩu của bạn.',
+  errGoogleUnavailable: 'Dịch vụ Google Play không khả dụng trên thiết bị này.',
 
   wearable: 'Thiết bị',
   homeSubtitle: 'Xem kết nối trực tiếp một cách gọn gàng.',

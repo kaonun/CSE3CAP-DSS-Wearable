@@ -10,7 +10,15 @@
     "ios": {
       "icon": "./assets/images/app-icon.png",
       "bundleIdentifier": "com.fusionfive.dsswearable",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "DSS Wearable uses Bluetooth to connect to your wearable device and read its sensor data.",
+        "NSBluetoothPeripheralUsageDescription": "DSS Wearable uses Bluetooth to connect to your wearable device and read its sensor data.",
+        "NFCReaderUsageDescription": "DSS Wearable reads NFC tags to identify which wearable device to connect to."
+      },
+      "entitlements": {
+        "com.apple.developer.nfc.readersession.formats": ["NDEF"]
+      }
     },
     "android": {
       "package": "com.fusionfive.dsswearable",
@@ -54,7 +62,13 @@
       ],
       "expo-secure-store",
       "expo-localization",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.845518508981-fif8i2gdkdorsai0s3tqhmovndhjcldv"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

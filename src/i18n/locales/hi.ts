@@ -33,6 +33,7 @@ export const hi: Messages = {
   errNetwork: 'नेटवर्क उपलब्ध नहीं। अपना कनेक्शन जाँचें।',
   errGeneric: 'कुछ गलत हो गया। कृपया पुनः प्रयास करें।',
   errEmptyFields: 'अपना ईमेल और पासवर्ड दर्ज करें।',
+  errGoogleUnavailable: 'इस डिवाइस पर Google Play सेवाएँ उपलब्ध नहीं हैं।',
 
   wearable: 'डिवाइस',
   homeSubtitle: 'आपके लाइव कनेक्शन का एक सरल दृश्य।',

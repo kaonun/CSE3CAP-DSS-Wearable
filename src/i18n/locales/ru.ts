@@ -33,6 +33,7 @@ export const ru: Messages = {
   errNetwork: 'Сеть недоступна. Проверьте подключение.',
   errGeneric: 'Что-то пошло не так. Попробуйте ещё раз.',
   errEmptyFields: 'Введите почту и пароль.',
+  errGoogleUnavailable: 'Сервисы Google Play недоступны на этом устройстве.',
 
   wearable: 'Устройство',
   homeSubtitle: 'Спокойный обзор вашего активного подключения.',

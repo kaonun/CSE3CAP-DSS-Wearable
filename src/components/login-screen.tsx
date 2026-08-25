@@ -1,7 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { makeRedirectUri, ResponseType } from 'expo-auth-session';
-import { useAuthRequest } from 'expo-auth-session/providers/google';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -19,7 +17,7 @@ import { TextField } from '@/components/ui/text-field';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n } from '@/i18n';
-import { AuthError, useAuth } from '@/auth';
+import { AuthError, googleSignInConfigured, useAuth } from '@/auth';
 
 type Mode = 'signIn' | 'register' | 'reset';
 
@@ -35,29 +33,28 @@ export default function LoginScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [request, response, promptAsync] = useAuthRequest({
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    responseType: ResponseType.IdToken,
-    redirectUri: makeRedirectUri({ scheme: 'dsswearable' }),
-  });
-
   const describe = (caught: unknown) =>
     caught instanceof AuthError ? t[caught.key] : t.errGeneric;
 
-  useEffect(() => {
-    if (response?.type !== 'success') return;
-    const idToken = response.params?.id_token;
-    if (!idToken) return;
+  /**
+   * The native account picker handles the whole flow, so there is no redirect
+   * to wait on — unlike the browser-based flow this replaced, which Google
+   * refuses for native apps.
+   */
+  const continueWithGoogle = async () => {
     setBusy(true);
     setError(null);
-    signInWithGoogle(idToken)
-      .catch(caught => setError(describe(caught)))
-      .finally(() => setBusy(false));
-    // `describe` closes over `t`, which is stable per language.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [response, signInWithGoogle]);
+    setNotice(null);
+    try {
+      // Resolves false when the picker is dismissed, which is a choice rather
+      // than a failure and so raises nothing.
+      await signInWithGoogle();
+    } catch (caught) {
+      setError(describe(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const switchMode = (next: Mode) => {
     setMode(next);
@@ -205,8 +202,8 @@ export default function LoginScreen() {
                   label={t.continueWithGoogle}
                   variant="plain"
                   icon="logo-google"
-                  onPress={() => promptAsync()}
-                  disabled={!request || !configured || busy}
+                  onPress={continueWithGoogle}
+                  disabled={!googleSignInConfigured || !configured || busy}
                 />
               </>
             ) : null}

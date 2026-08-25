@@ -33,6 +33,7 @@ export type Messages = {
   errNetwork: string;
   errGeneric: string;
   errEmptyFields: string;
+  errGoogleUnavailable: string;
   // Home / wearable
   wearable: string;
   homeSubtitle: string;

@@ -33,6 +33,7 @@ export const es: Messages = {
   errNetwork: 'Sin conexión. Comprueba tu red.',
   errGeneric: 'Algo salió mal. Inténtalo de nuevo.',
   errEmptyFields: 'Introduce tu correo y contraseña.',
+  errGoogleUnavailable: 'Los servicios de Google Play no están disponibles en este dispositivo.',
 
   wearable: 'Dispositivo',
   homeSubtitle: 'Una vista tranquila de tu conexión en vivo.',
