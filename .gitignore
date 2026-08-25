@@ -48,3 +48,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Claude Code's local working notes for this project — not app code
+/memory/
