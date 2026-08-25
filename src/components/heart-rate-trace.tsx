@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
+import Svg, { Circle, Polygon, Polyline } from 'react-native-svg';
 
-import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -58,12 +58,16 @@ export function BeatingHeart({
   );
 }
 
+/** Vertical breathing room so a peak or trough never touches the edge. */
+const TRACE_PADDING = 5;
+
 /**
- * Recent readings as a bar trace, oldest to newest. The newest bar is
- * emphasised so the eye lands on the current value.
+ * Recent readings as a continuous monitor-style line, oldest to newest —
+ * closer to a hospital vitals trace than a bar chart, which reads as a jagged
+ * staircase once the value stops climbing steadily.
  */
 export function HeartRateTrace({ values, color }: { values: number[]; color: string }) {
-  const theme = useTheme();
+  const [width, setWidth] = useState(0);
   if (values.length === 0) return null;
 
   const min = Math.min(...values);
@@ -72,39 +76,43 @@ export function HeartRateTrace({ values, color }: { values: number[]; color: str
   const span = Math.max(max - min, MIN_SPAN_BPM);
   const low = midpoint - span / 2;
 
+  const plotHeight = TRACE_HEIGHT - TRACE_PADDING * 2;
+  const yFor = (value: number) => {
+    const ratio = Math.min(1, Math.max(0, (value - low) / span));
+    return TRACE_HEIGHT - TRACE_PADDING - ratio * plotHeight;
+  };
+  const xFor = (index: number) =>
+    values.length > 1 ? (index / (values.length - 1)) * width : width / 2;
+
+  const points = values.map((value, index) => `${xFor(index)},${yFor(value)}`);
+  const linePoints = points.join(' ');
+  const fillPoints = [`${xFor(0)},${TRACE_HEIGHT}`, ...points, `${xFor(values.length - 1)},${TRACE_HEIGHT}`].join(' ');
+  const lastIndex = values.length - 1;
+
   return (
-    <View style={styles.trace}>
-      {values.map((value, index) => {
-        const ratio = Math.min(1, Math.max(0, (value - low) / span));
-        const isLatest = index === values.length - 1;
-        return (
-          <View
-            key={index}
-            style={[
-              styles.bar,
-              {
-                // A floor keeps every reading visible rather than collapsing
-                // the lowest one to nothing.
-                height: 6 + ratio * (TRACE_HEIGHT - 6),
-                backgroundColor: isLatest ? color : theme.separator,
-                opacity: isLatest ? 1 : 0.55 + ratio * 0.35,
-              },
-            ]}
-          />
-        );
-      })}
+    <View style={styles.trace} onLayout={event => setWidth(event.nativeEvent.layout.width)}>
+      {width > 0 ? (
+        <Svg width={width} height={TRACE_HEIGHT}>
+          <Polygon points={fillPoints} fill={color} opacity={0.12} />
+          {values.length > 1 ? (
+            <Polyline
+              points={linePoints}
+              fill="none"
+              stroke={color}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          ) : null}
+          <Circle cx={xFor(lastIndex)} cy={yFor(values[lastIndex])} r={4} fill={color} />
+        </Svg>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  trace: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 3,
-    height: TRACE_HEIGHT,
-  },
-  bar: { flex: 1, maxWidth: 7, borderRadius: 3, minWidth: 2 },
+  trace: { height: TRACE_HEIGHT },
 });
 
 export { TRACE_HEIGHT, MIN_SPAN_BPM };

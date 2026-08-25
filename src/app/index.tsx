@@ -7,16 +7,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ConnectSheet } from '@/components/connect-sheet';
 import { BeatingHeart, HeartRateTrace } from '@/components/heart-rate-trace';
 import { MetricPicker } from '@/components/metric-picker';
+import { RenameDeviceModal } from '@/components/rename-device-modal';
 import { SessionDuration } from '@/components/session-duration';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/surface';
 import { MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { ConnectedDevice, DeviceCapabilities, useBleDevice, useNfc } from '@/connectivity';
+import { characteristicUuidFromMetricId } from '@/connectivity/customMetric';
 import { useReadingSyncContext } from '@/data/reading-sync-context';
+import { useDeviceNames } from '@/device-names';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n, type Messages } from '@/i18n';
-import { METRIC_INFO, metricColor, metricIcon, useMetricPreference, type MetricKey } from '@/metrics';
+import { metricColor, metricIcon, resolveMetricInfo, useMetricPreference, type CustomMetricDef } from '@/metrics';
 
 function formatClock(timestamp: number) {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -37,17 +40,19 @@ function StatusPill({ label, color }: { label: string; color: string }) {
 function PrimaryMetric({
   metric,
   device,
+  customMetrics,
   theme,
   t,
 }: {
-  metric: MetricKey;
+  metric: string;
   device: ConnectedDevice;
+  customMetrics: CustomMetricDef[];
   theme: ReturnType<typeof useTheme>;
   t: Messages;
 }) {
   const value = device.readings[metric];
-  const history = device.history[metric];
-  const info = METRIC_INFO[metric];
+  const history = device.history[metric] ?? [];
+  const info = resolveMetricInfo(metric, customMetrics, t);
 
   return (
     <>
@@ -62,9 +67,11 @@ function PrimaryMetric({
           {value ?? '--'}
         </ThemedText>
         <View style={styles.unitCol}>
-          <ThemedText type="title3" themeColor="textSecondary">
-            {t[info.unitKey]}
-          </ThemedText>
+          {info.unit ? (
+            <ThemedText type="title3" themeColor="textSecondary">
+              {info.unit}
+            </ThemedText>
+          ) : null}
           {info.derived ? (
             <ThemedText type="caption" themeColor="textTertiary">
               {t.estimated}
@@ -90,23 +97,25 @@ function PrimaryMetric({
 function SecondaryMetric({
   metric,
   device,
+  customMetrics,
   t,
   onRemove,
 }: {
-  metric: MetricKey;
+  metric: string;
   device: ConnectedDevice;
+  customMetrics: CustomMetricDef[];
   t: Messages;
   onRemove: () => void;
 }) {
   const theme = useTheme();
   const value = device.readings[metric];
-  const info = METRIC_INFO[metric];
+  const info = resolveMetricInfo(metric, customMetrics, t);
 
   return (
     <View style={styles.metricTile}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={t.removeMetric.replace('{metric}', t[info.labelKey])}
+        accessibilityLabel={t.removeMetric.replace('{metric}', info.label)}
         hitSlop={8}
         onPress={onRemove}
         style={({ pressed }) => [styles.removeMetric, { opacity: pressed ? 0.5 : 1 }]}>
@@ -116,8 +125,8 @@ function SecondaryMetric({
       <ThemedText type="title2" themeColor={value !== null ? 'text' : 'textTertiary'}>
         {value ?? '--'}
       </ThemedText>
-      <ThemedText type="caption" themeColor="textSecondary">
-        {t[info.unitKey]}
+      <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
+        {info.unit || info.label}
         {info.derived ? ` · ${t.estimated}` : ''}
       </ThemedText>
     </View>
@@ -130,12 +139,12 @@ function AddMetricTile({ onPress, t }: { onPress: () => void; t: Messages }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t.changeMetrics}
+      accessibilityLabel={t.addMetrics}
       onPress={onPress}
       style={({ pressed }) => [styles.metricTile, styles.addMetricTile, { borderColor: theme.separator, opacity: pressed ? 0.6 : 1 }]}>
       <Ionicons name="add-circle-outline" size={22} color={theme.tint} />
       <ThemedText type="caption" themeColor="textSecondary">
-        {t.changeMetrics}
+        {t.addMetrics}
       </ThemedText>
     </Pressable>
   );
@@ -146,13 +155,19 @@ export default function WearableScreen() {
   const { t } = useI18n();
   const router = useRouter();
   const sync = useReadingSyncContext();
+  const metricPreference = useMetricPreference();
+  const customMetricTargets = metricPreference.customMetrics.map(def => ({
+    id: def.id,
+    characteristicUuid: characteristicUuidFromMetricId(def.id) ?? '',
+  }));
   // Readings flow straight into the aggregator, which batches them into
   // one-minute summaries before they reach Firestore.
-  const ble = useBleDevice(sync.record);
+  const ble = useBleDevice(sync.record, customMetricTargets);
   const nfc = useNfc();
-  const metricPreference = useMetricPreference();
+  const deviceNames = useDeviceNames();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [metricPickerOpen, setMetricPickerOpen] = useState(false);
+  const [renamingDeviceId, setRenamingDeviceId] = useState<string | null>(null);
 
   // Keep the aggregator's device-name lookup current so stored summaries carry
   // a readable name alongside the id.
@@ -178,14 +193,13 @@ export default function WearableScreen() {
   // device's real, GATT-discovered capabilities. Nothing to grey out yet
   // when no device is connected.
   const unionCapabilities: DeviceCapabilities | null = isConnected
-    ? ble.connectedDevices.reduce<DeviceCapabilities>(
-        (union, device) => ({
-          heartRate: union.heartRate || device.capabilities.heartRate,
-          cadence: union.cadence || device.capabilities.cadence,
-          calories: union.calories || device.capabilities.calories,
-        }),
-        { heartRate: false, cadence: false, calories: false },
-      )
+    ? ble.connectedDevices.reduce<DeviceCapabilities>((union, device) => {
+        const merged: DeviceCapabilities = { ...union };
+        for (const [metric, supported] of Object.entries(device.capabilities)) {
+          merged[metric] = merged[metric] || supported;
+        }
+        return merged;
+      }, {})
     : null;
 
   return (
@@ -237,9 +251,18 @@ export default function WearableScreen() {
                     <ThemedText type="footnote" themeColor="textSecondary" style={styles.label}>
                       {t.connection}
                     </ThemedText>
-                    <ThemedText type="headline" numberOfLines={1}>
-                      {device.name || t.unnamedDevice}
-                    </ThemedText>
+                    <View style={styles.nameRow}>
+                      <ThemedText type="headline" numberOfLines={1} style={styles.nameText}>
+                        {device.name || t.unnamedDevice}
+                      </ThemedText>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t.renameDevice}
+                        hitSlop={8}
+                        onPress={() => setRenamingDeviceId(device.id)}>
+                        <Ionicons name="pencil" size={14} color={theme.textSecondary} />
+                      </Pressable>
+                    </View>
                     {/* The address is the only reliable identifier when a
                         peripheral advertises no name. */}
                     <ThemedText type="caption" themeColor="textTertiary" numberOfLines={1} selectable>
@@ -261,7 +284,13 @@ export default function WearableScreen() {
                 </View>
 
                 {primaryMetric ? (
-                  <PrimaryMetric metric={primaryMetric} device={device} theme={theme} t={t} />
+                  <PrimaryMetric
+                    metric={primaryMetric}
+                    device={device}
+                    customMetrics={metricPreference.customMetrics}
+                    theme={theme}
+                    t={t}
+                  />
                 ) : (
                   <Pressable onPress={() => setMetricPickerOpen(true)} style={styles.emptyTrace}>
                     <ThemedText type="footnote" themeColor="textTertiary">
@@ -277,6 +306,7 @@ export default function WearableScreen() {
                         key={metric}
                         metric={metric}
                         device={device}
+                        customMetrics={metricPreference.customMetrics}
                         t={t}
                         onRemove={() => metricPreference.toggleMetric(metric)}
                       />
@@ -451,6 +481,17 @@ export default function WearableScreen() {
         onClose={() => setMetricPickerOpen(false)}
         capabilities={unionCapabilities}
       />
+
+      <RenameDeviceModal
+        visible={renamingDeviceId !== null}
+        currentName={ble.connectedDevices.find(device => device.id === renamingDeviceId)?.name ?? null}
+        onSave={name => {
+          if (!renamingDeviceId) return;
+          deviceNames.setName(renamingDeviceId, name);
+          ble.renameDevice(renamingDeviceId, name);
+        }}
+        onClose={() => setRenamingDeviceId(null)}
+      />
     </View>
   );
 }
@@ -461,8 +502,10 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: {
     paddingHorizontal: Spacing.three,
-    // Extra room so the floating history button never covers the last card.
-    paddingBottom: Spacing.six + Spacing.five,
+    // Extra room so the floating history button never covers the last card —
+    // generous because the hero card's height varies with how many metrics
+    // are shown.
+    paddingBottom: Spacing.six * 2,
     gap: Spacing.three,
     width: '100%',
     maxWidth: MaxContentWidth,
@@ -483,7 +526,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     alignItems: 'center',
-    paddingBottom: Spacing.three,
+    paddingBottom: Spacing.two,
   },
   historyButton: {
     flexDirection: 'row',
@@ -507,6 +550,8 @@ const styles = StyleSheet.create({
   hero: { padding: Spacing.four, gap: Spacing.three },
   heroTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.two },
   heroLabels: { flex: 1, gap: Spacing.half },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
+  nameText: { flexShrink: 1 },
   heroActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   cardAction: { padding: Spacing.half },
   emptyState: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.four },
@@ -515,18 +560,16 @@ const styles = StyleSheet.create({
   unit: { marginBottom: Spacing.one },
   unitCol: { marginBottom: Spacing.one, gap: 0 },
   emptyTrace: { height: 52, justifyContent: 'center' },
-  secondaryRow: { flexDirection: 'row', gap: Spacing.three },
+  secondaryRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.three },
   metricTile: { alignItems: 'flex-start', gap: 1, paddingTop: Spacing.two, position: 'relative' },
   removeMetric: { position: 'absolute', top: -4, right: -4 },
   addMetricTile: {
     alignItems: 'center',
-    justifyContent: 'center',
     gap: Spacing.half,
     borderWidth: StyleSheet.hairlineWidth,
     borderStyle: 'dashed',
     borderRadius: Radius.sm,
     paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
   },
 
   pill: {

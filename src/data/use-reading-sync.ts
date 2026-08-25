@@ -55,6 +55,7 @@ export function useReadingSync() {
       existing.max = Math.max(existing.max, reading.value);
       existing.sum += reading.value;
       existing.count += 1;
+      existing.lastTimestamp = Math.max(existing.lastTimestamp, reading.timestamp);
     } else {
       buckets.current.set(key, {
         deviceId: reading.deviceId,
@@ -65,6 +66,8 @@ export function useReadingSync() {
         max: reading.value,
         sum: reading.value,
         count: 1,
+        firstTimestamp: reading.timestamp,
+        lastTimestamp: reading.timestamp,
       });
       setPendingCount(buckets.current.size);
     }

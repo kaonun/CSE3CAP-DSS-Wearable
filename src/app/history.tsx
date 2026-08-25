@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HistoryChart } from '@/components/history-chart';
+import { formatDuration } from '@/components/session-duration';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/surface';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -13,13 +14,59 @@ import {
   devicesIn,
   filterByRange,
   toChartPoints,
+  totalOverDuration,
   type RangeKey,
+  type Stats,
 } from '@/data/analytics';
 import { useReadingSyncContext } from '@/data/reading-sync-context';
 import { fetchSummaries, type Summary } from '@/data/summaries';
 import { useTheme } from '@/hooks/use-theme';
-import { useI18n } from '@/i18n';
-import { METRIC_INFO, METRIC_ORDER, metricColor, type MetricKey } from '@/metrics';
+import { useI18n, type Messages } from '@/i18n';
+import { isCustomMetricId, METRIC_ORDER, metricColor, resolveMetricInfo, useMetricPreference } from '@/metrics';
+
+type StatTileDef = { key: string; label: string; value: string; unit?: string; headline?: boolean };
+
+/**
+ * Which stats actually mean something depends on what kind of metric this
+ * is. Heart rate is a level (it makes sense to average or find a resting
+ * value), while cadence and calories are both instantaneous rates read
+ * straight off the device/estimate each second — summing their averages
+ * would be meaningless, but averaging them and integrating over the time
+ * they were recorded (durationSeconds) gives a real total. A custom metric's
+ * nature is unknown, so it only gets the safe, rate-agnostic stats.
+ */
+function buildStatTiles(metric: string, stats: Stats, total: number, t: Messages): StatTileDef[] {
+  const show = (value: number | null) => (value === null ? '--' : String(value));
+
+  if (metric === 'heartRate') {
+    return [
+      { key: 'average', label: t.average, value: show(stats.average), unit: t.bpm, headline: true },
+      { key: 'resting', label: t.resting, value: show(stats.resting), unit: t.bpm },
+      { key: 'minimum', label: t.minimum, value: show(stats.minimum), unit: t.bpm },
+      { key: 'maximum', label: t.maximum, value: show(stats.maximum), unit: t.bpm },
+    ];
+  }
+  if (metric === 'cadence') {
+    return [
+      { key: 'total', label: t.totalSteps, value: show(total), headline: true },
+      { key: 'average', label: t.averageRate, value: show(stats.average), unit: t.spm },
+      { key: 'peak', label: t.peakRate, value: show(stats.maximum), unit: t.spm },
+    ];
+  }
+  if (metric === 'calories') {
+    return [
+      { key: 'total', label: t.totalBurned, value: show(total), unit: t.kcal, headline: true },
+      { key: 'average', label: t.averageRate, value: show(stats.average), unit: t.kcalPerMin },
+      { key: 'peak', label: t.peakRate, value: show(stats.maximum), unit: t.kcalPerMin },
+    ];
+  }
+  // Custom metric — its meaning is unknown, so no assumed total.
+  return [
+    { key: 'average', label: t.average, value: show(stats.average), headline: true },
+    { key: 'minimum', label: t.minimum, value: show(stats.minimum) },
+    { key: 'maximum', label: t.maximum, value: show(stats.maximum) },
+  ];
+}
 
 function StatTile({
   label,
@@ -56,9 +103,10 @@ export default function HistoryScreen() {
   const router = useRouter();
   const { t } = useI18n();
   const sync = useReadingSyncContext();
+  const { customMetrics } = useMetricPreference();
 
   const [range, setRange] = useState<RangeKey>('today');
-  const [metric, setMetric] = useState<MetricKey>('heartRate');
+  const [metric, setMetric] = useState<string>('heartRate');
   const [summaries, setSummaries] = useState<Summary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -89,11 +137,16 @@ export default function HistoryScreen() {
   }, [load]);
 
   // Different metrics are not comparable (bpm vs steps/min vs kcal), so stats
-  // and the chart only ever look at one metric at a time.
-  const availableMetrics = useMemo(
-    () => METRIC_ORDER.filter(candidate => summaries.some(summary => summary.metric === candidate)),
-    [summaries],
-  );
+  // and the chart only ever look at one metric at a time. Built-ins come
+  // first in their canonical order; any custom metric ids present in the
+  // data follow — History reads straight from Firestore, so this includes
+  // custom metrics recorded from any device, not just currently-configured ones.
+  const availableMetrics = useMemo(() => {
+    const present = new Set(summaries.map(summary => summary.metric));
+    const builtIns = METRIC_ORDER.filter(candidate => present.has(candidate));
+    const customs = Array.from(present).filter(id => isCustomMetricId(id));
+    return [...builtIns, ...customs];
+  }, [summaries]);
 
   // Keep the selection pinned to a metric that actually has data.
   useEffect(() => {
@@ -111,16 +164,20 @@ export default function HistoryScreen() {
   const stats = useMemo(() => computeStats(inRange), [inRange]);
   const points = useMemo(() => toChartPoints(inRange, range), [inRange, range]);
   const contributors = useMemo(() => devicesIn(inRange), [inRange]);
-  const unit = t[METRIC_INFO[metric].unitKey];
+  const total = useMemo(() => totalOverDuration(inRange), [inRange]);
+  const recordedSeconds = useMemo(
+    () => inRange.reduce((sum, summary) => sum + summary.durationSeconds, 0),
+    [inRange],
+  );
+  const metricInfo = resolveMetricInfo(metric, customMetrics, t);
   const color = metricColor(metric, theme);
+  const statTiles = useMemo(() => buildStatTiles(metric, stats, total, t), [metric, stats, total, t]);
 
   const ranges: { key: RangeKey; label: string }[] = [
     { key: 'today', label: t.rangeToday },
     { key: 'week', label: t.rangeWeek },
     { key: 'month', label: t.rangeMonth },
   ];
-
-  const show = (value: number | null) => (value === null ? '--' : String(value));
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -159,7 +216,7 @@ export default function HistoryScreen() {
             <View style={styles.metricChips}>
               {availableMetrics.map(option => {
                 const selected = option === metric;
-                const info = METRIC_INFO[option];
+                const info = resolveMetricInfo(option, customMetrics, t);
                 return (
                   <Pressable
                     key={option}
@@ -174,8 +231,9 @@ export default function HistoryScreen() {
                     <Text style={styles.metricChipEmoji}>{info.emoji}</Text>
                     <ThemedText
                       type="footnote"
-                      style={{ color: selected ? theme.tintContrast : theme.textSecondary }}>
-                      {t[info.labelKey]}
+                      style={{ color: selected ? theme.tintContrast : theme.textSecondary }}
+                      numberOfLines={1}>
+                      {info.label}
                     </ThemedText>
                   </Pressable>
                 );
@@ -232,25 +290,23 @@ export default function HistoryScreen() {
             <>
               <Card style={styles.chartCard}>
                 <View style={styles.chartHeader}>
-                  <Text style={styles.chartHeaderEmoji}>{METRIC_INFO[metric].emoji}</Text>
-                  <ThemedText type="headline">{t[METRIC_INFO[metric].labelKey]}</ThemedText>
+                  <Text style={styles.chartHeaderEmoji}>{metricInfo.emoji}</Text>
+                  <ThemedText type="headline">{metricInfo.label}</ThemedText>
                 </View>
                 <HistoryChart points={points} color={color} />
               </Card>
 
               <View style={styles.statGrid}>
-                <Card style={styles.statCard}>
-                  <StatTile label={t.average} value={show(stats.average)} unit={unit} color={color} />
-                </Card>
-                <Card style={styles.statCard}>
-                  <StatTile label={t.resting} value={show(stats.resting)} unit={unit} />
-                </Card>
-                <Card style={styles.statCard}>
-                  <StatTile label={t.minimum} value={show(stats.minimum)} unit={unit} />
-                </Card>
-                <Card style={styles.statCard}>
-                  <StatTile label={t.maximum} value={show(stats.maximum)} unit={unit} />
-                </Card>
+                {statTiles.map(tile => (
+                  <Card key={tile.key} style={styles.statCard}>
+                    <StatTile
+                      label={tile.label}
+                      value={tile.value}
+                      unit={tile.unit}
+                      color={tile.headline ? color : undefined}
+                    />
+                  </Card>
+                ))}
               </View>
 
               <Card style={styles.summaryCard}>
@@ -259,6 +315,12 @@ export default function HistoryScreen() {
                     {t.activeMinutes}
                   </ThemedText>
                   <ThemedText type="headline">{stats.activeMinutes}</ThemedText>
+                </View>
+                <View style={styles.summaryRow}>
+                  <ThemedText type="subhead" themeColor="textSecondary">
+                    {t.recordedTime}
+                  </ThemedText>
+                  <ThemedText type="headline">{formatDuration(recordedSeconds * 1000, t)}</ThemedText>
                 </View>
               </Card>
 
@@ -362,7 +424,7 @@ const styles = StyleSheet.create({
   statTile: { gap: Spacing.half },
   statValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one },
 
-  summaryCard: { padding: Spacing.three },
+  summaryCard: { padding: Spacing.three, gap: Spacing.two },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
   section: { gap: Spacing.two },

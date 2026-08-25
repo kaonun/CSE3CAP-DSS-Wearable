@@ -1,10 +1,15 @@
 import {Platform} from 'react-native';
 import {toByteArray} from 'base64-js';
 import {requestBlePermissions} from './permissions';
+import {deviceKindFromAppearance, parseAppearanceFromScanRecord} from './appearance';
 import {CADENCE_MEASUREMENT_UUID, CADENCE_SERVICE_UUID, decodeCadenceMeasurement} from './cadence';
+import {decodeCustomValue} from './customMetric';
 import {decodeHeartRateMeasurement, HEART_RATE_MEASUREMENT_UUID, HEART_RATE_SERVICE_UUID} from './heartRate';
 import {mockConnect, mockDisconnect, mockScan} from './mock';
 import {BleDeviceInfo, BleReadingHandler, capabilitiesFromServices, DeviceCapabilities} from './types';
+
+/** A user-defined metric to look for and subscribe to, if this device has it. */
+export type CustomMetricTarget = {id: string; characteristicUuid: string};
 
 type ErrorHandler = (error: Error) => void;
 
@@ -14,6 +19,7 @@ type ScannedDevice = {
   localName?: string | null;
   rssi?: number | null;
   serviceUUIDs?: string[] | null;
+  rawScanRecord?: string | null;
 };
 
 type ConnectedPeripheral = {
@@ -22,6 +28,7 @@ type ConnectedPeripheral = {
   discoverAllServicesAndCharacteristics: () => Promise<unknown>;
   cancelConnection: () => Promise<unknown>;
   services: () => Promise<{uuid: string}[]>;
+  characteristicsForService: (serviceUUID: string) => Promise<{uuid: string}[]>;
   readCharacteristicForService?: (
     service: string,
     characteristic: string,
@@ -114,6 +121,7 @@ export function mergeScanResult(
   const advertisedUuids = (packet.serviceUUIDs ?? []).map(uuid => uuid.toLowerCase());
   const advertisesHeartRate = advertisedUuids.includes(HEART_RATE_SERVICE_UUID.toLowerCase());
   const advertisesCadence = advertisedUuids.includes(CADENCE_SERVICE_UUID.toLowerCase());
+  const deviceKind = deviceKindFromAppearance(parseAppearanceFromScanRecord(packet.rawScanRecord));
 
   return {
     id: packet.id,
@@ -123,6 +131,7 @@ export function mergeScanResult(
     // Once a device has advertised the service, it has the service.
     advertisesHeartRate: advertisesHeartRate || !!existing?.advertisesHeartRate,
     advertisesCadence: advertisesCadence || !!existing?.advertisesCadence,
+    deviceKind: deviceKind ?? existing?.deviceKind ?? null,
   };
 }
 
@@ -195,9 +204,11 @@ export async function connectBleDevice(
   onName?: (name: string) => void,
   /** Called once with what the device's real, discovered GATT services support. */
   onCapabilities?: (capabilities: DeviceCapabilities) => void,
+  /** User-defined characteristics to also look for on this device. */
+  customMetrics: CustomMetricTarget[] = [],
 ): Promise<void> {
   if (!/^[A-Za-z0-9:_-]{1,128}$/.test(deviceId)) throw new Error('Invalid device identifier');
-  if (isMockMode) return mockConnect(deviceId, onReading, onCapabilities);
+  if (isMockMode) return mockConnect(deviceId, onReading, onCapabilities, customMetrics);
   if (!(await requestBlePermissions())) throw new Error('Bluetooth permissions were not granted');
   stopBleScan();
   if (connections.has(deviceId)) return;
@@ -208,16 +219,43 @@ export async function connectBleDevice(
   // connection down. The second attempt succeeds because the first populated
   // the cache. Retrying here spares the user from having to tap twice.
   try {
-    await attemptConnection(deviceId, onReading, onError, onName, onCapabilities);
+    await attemptConnection(deviceId, onReading, onError, onName, onCapabilities, customMetrics);
   } catch (firstError) {
     await delay(RETRY_DELAY_MS);
     try {
-      await attemptConnection(deviceId, onReading, onError, onName, onCapabilities);
+      await attemptConnection(deviceId, onReading, onError, onName, onCapabilities, customMetrics);
     } catch {
       // Report the original failure — it describes why the device refused.
       throw firstError;
     }
   }
+}
+
+/**
+ * Maps every discovered characteristic UUID to the service it lives under, so
+ * a custom metric only has to name the characteristic — the same way a user
+ * would read it off a generic BLE scanner app — without also having to know
+ * which service owns it.
+ */
+async function mapCharacteristicOwners(
+  device: ConnectedPeripheral,
+  serviceUuids: string[],
+): Promise<Map<string, string>> {
+  const owners = new Map<string, string>();
+  await Promise.all(
+    serviceUuids.map(async serviceUuid => {
+      try {
+        const characteristics = await device.characteristicsForService(serviceUuid);
+        for (const characteristic of characteristics) {
+          const key = characteristic.uuid.toLowerCase();
+          if (!owners.has(key)) owners.set(key, serviceUuid);
+        }
+      } catch {
+        // Best effort — a service that fails to enumerate just contributes nothing.
+      }
+    }),
+  );
+  return owners;
 }
 
 /** Pause between a failed connection and the retry, letting the stack settle. */
@@ -233,6 +271,7 @@ async function attemptConnection(
   onError: ErrorHandler,
   onName?: (name: string) => void,
   onCapabilities?: (capabilities: DeviceCapabilities) => void,
+  customMetrics: CustomMetricTarget[] = [],
 ): Promise<void> {
   if (connections.has(deviceId)) return;
 
@@ -247,7 +286,16 @@ async function attemptConnection(
     const discoveredUuids = discovered.map(service => service.uuid.toLowerCase());
     const hasHeartRate = discoveredUuids.includes(HEART_RATE_SERVICE_UUID.toLowerCase());
     const hasCadence = discoveredUuids.includes(CADENCE_SERVICE_UUID.toLowerCase());
-    onCapabilities?.(capabilitiesFromServices({heartRate: hasHeartRate, cadence: hasCadence}));
+    const capabilities: DeviceCapabilities = capabilitiesFromServices({heartRate: hasHeartRate, cadence: hasCadence});
+
+    // Only pay for the extra per-service characteristic lookups when there is
+    // actually a custom metric configured to look for.
+    const characteristicOwners =
+      customMetrics.length > 0 ? await mapCharacteristicOwners(device, discoveredUuids) : new Map<string, string>();
+    for (const target of customMetrics) {
+      capabilities[target.id] = characteristicOwners.has(target.characteristicUuid.toLowerCase());
+    }
+    onCapabilities?.(capabilities);
 
     const subscriptions: {remove: () => void}[] = [];
 
@@ -290,6 +338,25 @@ async function attemptConnection(
             }
           },
         ),
+      );
+    }
+
+    for (const target of customMetrics) {
+      const serviceUuid = characteristicOwners.get(target.characteristicUuid.toLowerCase());
+      if (!serviceUuid) continue;
+      subscriptions.push(
+        device.monitorCharacteristicForService(serviceUuid, target.characteristicUuid, (error, characteristic) => {
+          if (error) {
+            if (!intentionalDisconnects.has(deviceId)) onError(error);
+            return;
+          }
+          if (!characteristic?.value) return;
+          try {
+            onReading({metric: target.id, value: decodeCustomValue(characteristic.value), deviceId, timestamp: Date.now()});
+          } catch (decodeError) {
+            onError(decodeError instanceof Error ? decodeError : new Error('Invalid sensor payload'));
+          }
+        }),
       );
     }
 

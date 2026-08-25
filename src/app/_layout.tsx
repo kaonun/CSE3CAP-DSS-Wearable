@@ -8,6 +8,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppNavigator from '@/components/app-navigator';
 import { Colors } from '@/constants/theme';
 import { ReadingSyncProvider } from '@/data/reading-sync-context';
+import { DeviceNamesProvider } from '@/device-names';
 import { I18nProvider, useI18n } from '@/i18n';
 import { MetricPreferenceProvider } from '@/metrics';
 import { ThemePreferenceProvider, useThemePreference } from '@/theme-preference';
@@ -25,9 +26,11 @@ export default function RootLayout() {
         <AuthProvider>
           <I18nProvider>
             <MetricPreferenceProvider>
-              <ReadingSyncProvider>
-                <RootTheme />
-              </ReadingSyncProvider>
+              <DeviceNamesProvider>
+                <ReadingSyncProvider>
+                  <RootTheme />
+                </ReadingSyncProvider>
+              </DeviceNamesProvider>
             </MetricPreferenceProvider>
           </I18nProvider>
         </AuthProvider>

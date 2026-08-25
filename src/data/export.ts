@@ -18,6 +18,7 @@ const HEADERS = [
   'avg_value',
   'max_value',
   'sample_count',
+  'duration_seconds',
 ] as const;
 
 /**
@@ -42,6 +43,7 @@ export function summariesToCsv(summaries: Summary[]): string {
       summary.avg,
       summary.max,
       summary.count,
+      summary.durationSeconds,
     ]
       .map(csvField)
       .join(','),

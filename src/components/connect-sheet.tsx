@@ -5,10 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { TextField } from '@/components/ui/text-field';
 import { Radius, Shadow, Spacing } from '@/constants/theme';
+import { useDeviceNames } from '@/device-names';
 import { useTheme } from '@/hooks/use-theme';
-import { useI18n } from '@/i18n';
-import type { BleDeviceInfo } from '@/connectivity';
+import { useI18n, type Messages } from '@/i18n';
+import type { BleDeviceInfo, DeviceKind } from '@/connectivity';
 
 /**
  * Bluetooth and NFC are not competing transports here — NFC only identifies
@@ -16,7 +18,9 @@ import type { BleDeviceInfo } from '@/connectivity';
  * sheet presents one goal ("connect a device") with two ways to pick the
  * target, rather than two parallel features.
  */
-type Method = 'choose' | 'bluetooth' | 'nfc';
+type Method = 'choose' | 'bluetooth' | 'nfc' | 'naming';
+
+type PendingConnection = { deviceId: string; via: 'bluetooth' | 'nfc'; defaultName: string | null };
 
 export type ConnectSheetProps = {
   visible: boolean;
@@ -53,7 +57,10 @@ export function ConnectSheet({
 }: ConnectSheetProps) {
   const theme = useTheme();
   const { t } = useI18n();
+  const deviceNames = useDeviceNames();
   const [method, setMethod] = useState<Method>('choose');
+  const [pending, setPending] = useState<PendingConnection | null>(null);
+  const [nameInput, setNameInput] = useState('');
   // Remembers which tag we already acted on. Without this, any extra run of the
   // effect below fires a second connect for the same tag, and the resulting
   // connect/fail/retry churn shows up as rapid flicker between states.
@@ -63,18 +70,43 @@ export function ConnectSheet({
   useEffect(() => {
     if (visible) {
       setMethod('choose');
+      setPending(null);
       handledTag.current = null;
     }
   }, [visible]);
 
-  // A tag read hands back a device id; connect to it and close.
+  /**
+   * Connects immediately if this device already has a chosen name — asking
+   * again every time would be repetitive. A never-before-seen device instead
+   * goes to the naming step, pre-filled with whatever name is already known.
+   */
+  const beginConnect = (deviceId: string, via: 'bluetooth' | 'nfc', defaultName: string | null) => {
+    const existing = deviceNames.getName(deviceId);
+    if (existing) {
+      onConnect(deviceId, via, existing);
+      onClose();
+      return;
+    }
+    setPending({ deviceId, via, defaultName });
+    setNameInput(defaultName ?? '');
+    setMethod('naming');
+  };
+
+  const confirmName = () => {
+    if (!pending) return;
+    const trimmed = nameInput.trim();
+    if (trimmed) deviceNames.setName(pending.deviceId, trimmed);
+    onConnect(pending.deviceId, pending.via, trimmed || null);
+    onClose();
+  };
+
+  // A tag read hands back a device id; start the connect (or naming) flow.
   useEffect(() => {
     if (method !== 'nfc' || !nfc.tagId) return;
     if (handledTag.current === nfc.tagId) return;
     handledTag.current = nfc.tagId;
-    onConnect(nfc.tagId, 'nfc', nfc.tagName);
-    onClose();
-  }, [method, nfc.tagId, nfc.tagName, onConnect, onClose]);
+    beginConnect(nfc.tagId, 'nfc', nfc.tagName);
+  }, [method, nfc.tagId, nfc.tagName]);
 
   const dismiss = () => {
     if (nfc.reading) nfc.cancel();
@@ -109,7 +141,7 @@ export function ConnectSheet({
                 <Ionicons name="chevron-back" size={24} color={theme.tint} />
               </Pressable>
             )}
-            <ThemedText type="headline">{t.connectDevice}</ThemedText>
+            <ThemedText type="headline">{method === 'naming' ? t.nameDevice : t.connectDevice}</ThemedText>
             <Pressable accessibilityRole="button" hitSlop={12} onPress={dismiss}>
               <ThemedText type="body" style={{ color: theme.tint }}>
                 {t.cancel}
@@ -172,10 +204,7 @@ export function ConnectSheet({
                           device={device}
                           connected={connectedIds.includes(device.id)}
                           connecting={connectingId === device.id}
-                          onPress={() => {
-                            onConnect(device.id, 'bluetooth');
-                            onClose();
-                          }}
+                          onPress={() => beginConnect(device.id, 'bluetooth', device.name)}
                         />
                         {index < devices.length - 1 ? (
                           <View style={[styles.separator, { backgroundColor: theme.separator }]} />
@@ -206,6 +235,24 @@ export function ConnectSheet({
                   onPress={nfc.reading ? nfc.cancel : nfc.readTag}
                 />
               </View>
+            ) : null}
+
+            {method === 'naming' ? (
+              <>
+                <ThemedText type="subhead" themeColor="textSecondary" style={styles.prompt}>
+                  {t.nameDeviceHelp}
+                </ThemedText>
+                <TextField
+                  value={nameInput}
+                  onChangeText={setNameInput}
+                  placeholder={pending?.defaultName ?? t.unnamedDevice}
+                  autoCapitalize="words"
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={confirmName}
+                />
+                <Button label={t.connect} onPress={confirmName} />
+              </>
             ) : null}
           </ScrollView>
         </SafeAreaView>
@@ -301,6 +348,20 @@ function signalBars(rssi: number | null): number {
   return 1;
 }
 
+function deviceKindIcon(kind: DeviceKind): keyof typeof Ionicons.glyphMap {
+  if (kind === 'watch') return 'watch-outline';
+  if (kind === 'headphones') return 'headset-outline';
+  if (kind === 'speaker') return 'volume-high-outline';
+  return 'tv-outline';
+}
+
+function deviceKindLabel(kind: DeviceKind, t: Messages): string {
+  if (kind === 'watch') return t.deviceKindWatch;
+  if (kind === 'headphones') return t.deviceKindHeadphones;
+  if (kind === 'speaker') return t.deviceKindSpeaker;
+  return t.deviceKindTv;
+}
+
 function DeviceRow({
   device,
   connected,
@@ -346,6 +407,14 @@ function DeviceRow({
                 <Ionicons name="walk" size={10} color={theme.tint} />
                 <ThemedText type="caption" style={{ color: theme.tint }}>
                   {t.cadenceSensor}
+                </ThemedText>
+              </View>
+            ) : null}
+            {device.deviceKind ? (
+              <View style={[styles.badge, { backgroundColor: `${theme.textSecondary}22` }]}>
+                <Ionicons name={deviceKindIcon(device.deviceKind)} size={10} color={theme.textSecondary} />
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {deviceKindLabel(device.deviceKind, t)}
                 </ThemedText>
               </View>
             ) : null}

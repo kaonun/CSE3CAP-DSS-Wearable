@@ -13,20 +13,31 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
+    // A user-defined metric identifies the BLE characteristic it reads, e.g.
+    // "custom:00002a37-0000-1000-8000-00805f9b34fb" — mirrors
+    // src/connectivity/customMetric.ts's id format.
+    function isCustomMetric(metric) {
+      return metric.matches('^custom:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
+    }
+
     // Mirrors the client-side bounds in src/connectivity/heartRate.ts,
-    // src/connectivity/cadence.ts and src/connectivity/calories.ts so a
-    // compromised or modified client cannot store implausible readings.
+    // src/connectivity/cadence.ts, src/connectivity/calories.ts and
+    // src/connectivity/customMetric.ts so a compromised or modified client
+    // cannot store implausible readings.
     function isValidMetricValue(metric, value) {
       return (metric == 'heartRate' && value is int && value > 0 && value <= 300)
         || (metric == 'cadence' && value is int && value >= 0 && value <= 254)
         // Calories is an estimate, never a raw sensor bound — generously capped.
-        || (metric == 'calories' && value is int && value >= 0 && value <= 100);
+        || (metric == 'calories' && value is int && value >= 0 && value <= 100)
+        // A custom characteristic's meaning is unknown, so this is a wide,
+        // generic sanity bound rather than a domain-specific one.
+        || (isCustomMetric(metric) && value is int && value >= 0 && value <= 1000000);
     }
 
     function isValidSummary(data) {
-      return data.keys().hasAll(['deviceId', 'metric', 'bucketStart', 'min', 'max', 'avg', 'count'])
-        && data.keys().hasOnly(['deviceId', 'deviceName', 'metric', 'bucketStart', 'min', 'max', 'avg', 'count', 'createdAt'])
-        && data.metric in ['heartRate', 'cadence', 'calories']
+      return data.keys().hasAll(['deviceId', 'metric', 'bucketStart', 'min', 'max', 'avg', 'count', 'durationSeconds'])
+        && data.keys().hasOnly(['deviceId', 'deviceName', 'metric', 'bucketStart', 'min', 'max', 'avg', 'count', 'durationSeconds', 'createdAt'])
+        && (data.metric in ['heartRate', 'cadence', 'calories'] || isCustomMetric(data.metric))
         && data.deviceId is string
         && data.deviceId.size() > 0
         && data.deviceId.size() <= 128
@@ -38,7 +49,13 @@ service cloud.firestore {
         && data.min <= data.avg
         && data.avg <= data.max
         && data.count is int
-        && data.count > 0;
+        && data.count > 0
+        // A one-minute bucket can be flushed early and re-merged more than
+        // once, but the readings it covers can never span more than the
+        // bucket's own width (small slack for clock drift between flushes).
+        && data.durationSeconds is int
+        && data.durationSeconds >= 0
+        && data.durationSeconds <= 65;
     }
 
     // One document per device per one-minute bucket. Raw per-second readings

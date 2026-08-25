@@ -1,10 +1,11 @@
+import type {CustomMetricTarget} from './bleService';
 import {BleDeviceInfo, BleReadingHandler, capabilitiesFromServices, DeviceCapabilities, SensorReading} from './types';
 
 export const MOCK_DEVICES: BleDeviceInfo[] = [
-  {id: 'mock-wristband-01', name: 'Mock Wristband', rssi: -48, advertisesHeartRate: true, advertisesCadence: true},
-  {id: 'mock-chest-02', name: 'Mock Chest Strap', rssi: -63, advertisesHeartRate: true, advertisesCadence: false},
-  {id: 'mock-ring-03', name: 'Mock Ring', rssi: -71, advertisesHeartRate: false, advertisesCadence: false},
-  {id: 'mock-unnamed-04', name: null, rssi: -88, advertisesHeartRate: false, advertisesCadence: false},
+  {id: 'mock-wristband-01', name: 'Mock Wristband', rssi: -48, advertisesHeartRate: true, advertisesCadence: true, deviceKind: 'watch'},
+  {id: 'mock-chest-02', name: 'Mock Chest Strap', rssi: -63, advertisesHeartRate: true, advertisesCadence: false, deviceKind: null},
+  {id: 'mock-ring-03', name: 'Mock Ring', rssi: -71, advertisesHeartRate: false, advertisesCadence: false, deviceKind: null},
+  {id: 'mock-unnamed-04', name: null, rssi: -88, advertisesHeartRate: false, advertisesCadence: false, deviceKind: null},
 ];
 
 const timers = new Map<string, ReturnType<typeof setInterval>[]>();
@@ -18,6 +19,7 @@ export async function mockConnect(
   deviceId: string,
   onReading: BleReadingHandler,
   onCapabilities?: (capabilities: DeviceCapabilities) => void,
+  customMetrics: CustomMetricTarget[] = [],
 ): Promise<void> {
   if (timers.has(deviceId)) return;
 
@@ -26,7 +28,11 @@ export async function mockConnect(
   // heart-rate stream, matching the app's original mock behaviour.
   const heartRate = known?.advertisesHeartRate ?? true;
   const cadence = known?.advertisesCadence ?? false;
-  onCapabilities?.(capabilitiesFromServices({heartRate, cadence}));
+  const capabilities = capabilitiesFromServices({heartRate, cadence});
+  // Mock devices support any configured custom metric, so the whole pipeline
+  // is testable without real hardware.
+  for (const target of customMetrics) capabilities[target.id] = true;
+  onCapabilities?.(capabilities);
 
   const active: ReturnType<typeof setInterval>[] = [];
 
@@ -56,6 +62,20 @@ export async function mockConnect(
     };
     emitCadence();
     active.push(setInterval(emitCadence, 1000));
+  }
+
+  for (const target of customMetrics) {
+    const emitCustom = () => {
+      const reading: SensorReading = {
+        metric: target.id,
+        value: Math.floor(Math.random() * 100),
+        deviceId,
+        timestamp: Date.now(),
+      };
+      onReading(reading);
+    };
+    emitCustom();
+    active.push(setInterval(emitCustom, 1000));
   }
 
   timers.set(deviceId, active);

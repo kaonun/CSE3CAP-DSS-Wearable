@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {estimateCaloriesPerMinute} from './calories';
-import {connectBleDevice, destroyBle, disconnectBleDevice, scanBleDevices, stopBleScan} from './bleService';
+import {connectBleDevice, CustomMetricTarget, destroyBle, disconnectBleDevice, scanBleDevices, stopBleScan} from './bleService';
 import {
   BleDeviceInfo,
   ConnectedDevice,
@@ -26,7 +26,10 @@ function emptyHistory(): Record<MetricKey, number[]> {
   return {heartRate: [], cadence: [], calories: []};
 }
 
-export function useBleDevice(onReading?: (reading: MetricReading) => void) {
+export function useBleDevice(
+  onReading?: (reading: MetricReading) => void,
+  customMetrics: CustomMetricTarget[] = [],
+) {
   const [status, setStatus] = useState<ConnectionStatus>('idle');
   const [devices, setDevices] = useState<BleDeviceInfo[]>([]);
   // One entry per live connection. The BLE service already supports several
@@ -41,10 +44,17 @@ export function useBleDevice(onReading?: (reading: MetricReading) => void) {
 
   const callbackRef = useRef(onReading);
   callbackRef.current = onReading;
+  // A ref rather than a connect() dependency, so a change to the configured
+  // custom metrics never has to rebuild (and thus re-identity) the memoised
+  // connect callback — it just takes effect on the next connection attempt.
+  const customMetricsRef = useRef(customMetrics);
+  customMetricsRef.current = customMetrics;
 
   // Mirrors of state for use inside long-lived BLE subscriptions, so those
   // closures never need rebuilding when the values change.
   const connectedIds = useRef(new Set<string>());
+  /** Devices connected with a deliberate (caller-supplied) name this session. */
+  const namedDevices = useRef(new Set<string>());
   const devicesRef = useRef<BleDeviceInfo[]>([]);
   devicesRef.current = devices;
   const connectedRef = useRef<ConnectedDevice[]>([]);
@@ -104,6 +114,11 @@ export function useBleDevice(onReading?: (reading: MetricReading) => void) {
     setConnectingDeviceId(deviceId);
     heartRateAccumulator.current.delete(deviceId);
     pendingCapabilities.current.delete(deviceId);
+    // A caller-supplied name is a deliberate choice (a stored override, or
+    // one just confirmed in the naming prompt) — it must never be silently
+    // replaced by a name resolved off the device later.
+    if (nameHint) namedDevices.current.add(deviceId);
+    else namedDevices.current.delete(deviceId);
     try {
       await connectBleDevice(
         deviceId,
@@ -112,7 +127,19 @@ export function useBleDevice(onReading?: (reading: MetricReading) => void) {
           // of heart rate each time a new heart-rate value lands. The
           // accumulator is a ref mutation, so it must happen outside the
           // state updater below, which React may invoke more than once.
-          let derivedCalories: number | null = null;
+          //
+          // Two different numbers come out of this: `cumulativeCalories` is
+          // "how much has this session burned so far", which is what the
+          // live card shows — a satisfying running total. `rateCalories` is
+          // "kcal per minute right now", which is what actually gets synced.
+          // A cumulative counter cannot be meaningfully averaged or summed
+          // across buckets (each later bucket's value already includes every
+          // earlier one), so storing it would make History's stats — and any
+          // attempt to total up calories burned over a range — nonsensical.
+          // A rate can be averaged, peaked, and integrated over the stored
+          // per-bucket duration to reconstruct a correct total.
+          let cumulativeCalories: number | null = null;
+          let rateCalories: number | null = null;
           if (reading.metric === 'heartRate') {
             const accumulator = heartRateAccumulator.current.get(reading.deviceId) ?? {sum: 0, count: 0};
             accumulator.sum += reading.value;
@@ -120,7 +147,8 @@ export function useBleDevice(onReading?: (reading: MetricReading) => void) {
             heartRateAccumulator.current.set(reading.deviceId, accumulator);
             const averageHeartRate = accumulator.sum / accumulator.count;
             const elapsedMinutes = accumulator.count / 60;
-            derivedCalories = Math.round(estimateCaloriesPerMinute(averageHeartRate) * elapsedMinutes);
+            rateCalories = Math.round(estimateCaloriesPerMinute(averageHeartRate));
+            cumulativeCalories = Math.round(estimateCaloriesPerMinute(averageHeartRate) * elapsedMinutes);
           }
 
           setConnectedDevices(current =>
@@ -130,12 +158,13 @@ export function useBleDevice(onReading?: (reading: MetricReading) => void) {
               const readings = {...device.readings, [reading.metric]: reading.value};
               const history = {
                 ...device.history,
-                [reading.metric]: [...device.history[reading.metric], reading.value].slice(-TRACE_LENGTH),
+                // A metric id not seeded up front (a custom one) starts with no history yet.
+                [reading.metric]: [...(device.history[reading.metric] ?? []), reading.value].slice(-TRACE_LENGTH),
               };
 
-              if (derivedCalories !== null) {
-                readings.calories = derivedCalories;
-                history.calories = [...device.history.calories, derivedCalories].slice(-TRACE_LENGTH);
+              if (cumulativeCalories !== null) {
+                readings.calories = cumulativeCalories;
+                history.calories = [...device.history.calories, cumulativeCalories].slice(-TRACE_LENGTH);
               }
 
               return {...device, readings, history, updatedAt: reading.timestamp};
@@ -143,10 +172,10 @@ export function useBleDevice(onReading?: (reading: MetricReading) => void) {
           );
 
           callbackRef.current?.(reading);
-          if (derivedCalories !== null) {
+          if (rateCalories !== null) {
             callbackRef.current?.({
               metric: 'calories',
-              value: derivedCalories,
+              value: rateCalories,
               deviceId: reading.deviceId,
               timestamp: reading.timestamp,
             });
@@ -161,7 +190,8 @@ export function useBleDevice(onReading?: (reading: MetricReading) => void) {
         },
         resolvedName => {
           // A name read over GATT after connecting, for peripherals that do not
-          // advertise one. Update both the live card and the history entry.
+          // advertise one. Never overwrite a name the user deliberately chose.
+          if (namedDevices.current.has(deviceId)) return;
           setConnectedDevices(current =>
             current.map(device =>
               device.id === deviceId ? {...device, name: resolvedName} : device,
@@ -180,16 +210,16 @@ export function useBleDevice(onReading?: (reading: MetricReading) => void) {
             current.map(device => (device.id === deviceId ? {...device, capabilities} : device)),
           );
         },
+        customMetricsRef.current,
       );
 
       connectedIds.current.add(deviceId);
-      // Null name when the peripheral never advertised one, or when the device
-      // came from an NFC tag and was never in a scan result. The UI supplies a
-      // translated placeholder rather than baking English in here.
-      // A tag-initiated connection never went through a scan, so its name can
-      // only come from the tag itself.
+      // A deliberate name (a stored override, or one just confirmed in the
+      // naming prompt) always wins over whatever the peripheral advertised.
+      // Null when neither is available — the UI supplies a translated
+      // placeholder rather than baking English in here.
       const name =
-        devicesRef.current.find(device => device.id === deviceId)?.name ?? nameHint ?? null;
+        nameHint ?? devicesRef.current.find(device => device.id === deviceId)?.name ?? null;
 
       setConnectedDevices(current =>
         current.some(device => device.id === deviceId)
@@ -218,6 +248,19 @@ export function useBleDevice(onReading?: (reading: MetricReading) => void) {
       setConnectingDeviceId(null);
     }
   }, [closeHistoryEntry]);
+
+  /** Renames an already-connected device — updates the live card immediately. */
+  const renameDevice = useCallback((deviceId: string, name: string) => {
+    // Marks it as deliberately named, same as a name supplied at connect
+    // time, so a GATT-resolved name arriving later can't overwrite this.
+    namedDevices.current.add(deviceId);
+    setConnectedDevices(current =>
+      current.map(device => (device.id === deviceId ? {...device, name} : device)),
+    );
+    setConnectionHistory(current =>
+      current.map(entry => (entry.id === deviceId ? {...entry, name} : entry)),
+    );
+  }, []);
 
   /** Disconnects one device, or every device when no id is given. */
   const disconnect = useCallback((deviceId?: string) => {
@@ -289,5 +332,6 @@ export function useBleDevice(onReading?: (reading: MetricReading) => void) {
     scan,
     connect,
     disconnect,
+    renameDevice,
   };
 }

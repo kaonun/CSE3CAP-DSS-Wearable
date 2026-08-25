@@ -115,6 +115,17 @@ export function toChartPoints(summaries: Summary[], range: RangeKey): ChartPoint
     .sort((first, second) => first.start - second.start);
 }
 
+/**
+ * Integrates a rate-based metric (currently only calories, in kcal/min) over
+ * the time it was actually recorded, to get a true total rather than a
+ * meaningless sum of averages. Each bucket contributes avg × its own
+ * duration — exactly what durationSeconds was tracked for.
+ */
+export function totalOverDuration(summaries: Summary[]): number {
+  const kcalMinutes = summaries.reduce((total, summary) => total + (summary.avg * summary.durationSeconds) / 60, 0);
+  return Math.round(kcalMinutes);
+}
+
 /** Distinct devices that contributed to a set of summaries. */
 export function devicesIn(summaries: Summary[]): { id: string; name: string | null; samples: number }[] {
   const devices = new Map<string, { id: string; name: string | null; samples: number }>();

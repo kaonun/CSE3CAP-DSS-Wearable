@@ -135,9 +135,31 @@ export type Messages = {
   autoRecommendedHelp: string;
   metricUnavailable: string;
   changeMetrics: string;
+  addMetrics: string;
   cadenceSensor: string;
   noMetricsSelected: string;
   removeMetric: string;
+  recordedTime: string;
+  customMetrics: string;
+  addCustomMetric: string;
+  customMetricIdLabel: string;
+  customMetricIdHelp: string;
+  customMetricNameLabel: string;
+  customMetricInvalidId: string;
+  customMetricDuplicate: string;
+  add: string;
+  nameDevice: string;
+  nameDeviceHelp: string;
+  renameDevice: string;
+  deviceKindWatch: string;
+  deviceKindHeadphones: string;
+  deviceKindSpeaker: string;
+  deviceKindTv: string;
+  totalBurned: string;
+  totalSteps: string;
+  averageRate: string;
+  peakRate: string;
+  kcalPerMin: string;
 };
 
 export type Language =
