@@ -12,6 +12,7 @@ export default function AppNavigator() {
       <Stack.Screen name="index" />
       <Stack.Screen name="history" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="alerts" />
     </Stack>
   );
 }

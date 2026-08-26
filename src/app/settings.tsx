@@ -136,6 +136,17 @@ export default function SettingsScreen() {
             />
           </Section>
 
+          <Section header={t.alerts} footer={t.alertsSettingsHelp}>
+            <ListRow
+              title={t.alerts}
+              subtitle={t.alertsSubtitle}
+              icon="notifications-outline"
+              iconBackground={theme.tint}
+              onPress={() => router.push("/alerts")}
+              separator={false}
+            />
+          </Section>
+
           <Section header={t.account}>
             <ListRow
               title={

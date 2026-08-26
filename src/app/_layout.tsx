@@ -8,6 +8,8 @@ import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppNavigator from "@/components/app-navigator";
 import { Colors } from "@/constants/theme";
 import { ReadingSyncProvider } from "@/data/reading-sync-context";
+import { AlertPreferenceProvider } from "@/alerts";
+import { useNotificationPermissionPrompt } from "@/notifications";
 import { DeviceNamesProvider } from "@/device-names";
 import { I18nProvider, useI18n } from "@/i18n";
 import { MetricPreferenceProvider } from "@/metrics";
@@ -34,9 +36,11 @@ export default function RootLayout() {
           <I18nProvider>
             <MetricPreferenceProvider>
               <DeviceNamesProvider>
-                <ReadingSyncProvider>
-                  <RootTheme />
-                </ReadingSyncProvider>
+                <AlertPreferenceProvider>
+                  <ReadingSyncProvider>
+                    <RootTheme />
+                  </ReadingSyncProvider>
+                </AlertPreferenceProvider>
               </DeviceNamesProvider>
             </MetricPreferenceProvider>
           </I18nProvider>
@@ -63,6 +67,10 @@ function AuthGate() {
   const theme = Colors[resolvedScheme];
   const { configured, loading: authLoading, user } = useAuth();
   const { loading: languageLoading } = useI18n();
+
+  // Ask for notifications once the user is actually in the app. When Firebase
+  // is not configured there is no login step, so the app counts as "in".
+  useNotificationPermissionPrompt(!configured || !!user);
 
   // Hold the splash until the session, language and theme preference all
   // resolve, so the app never flashes English, the wrong theme, or the login

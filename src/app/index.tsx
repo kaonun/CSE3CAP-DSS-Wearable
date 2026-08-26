@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectSheet } from '@/components/connect-sheet';
@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/surface';
 import { MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { ConnectedDevice, DeviceCapabilities, useBleDevice, useNfc } from '@/connectivity';
 import { characteristicUuidFromMetricId } from '@/connectivity/customMetric';
+import { useAlertPreferences } from '@/alerts';
 import { useReadingSyncContext } from '@/data/reading-sync-context';
 import { useDeviceNames } from '@/device-names';
 import { useTheme } from '@/hooks/use-theme';
@@ -175,6 +176,26 @@ export default function WearableScreen() {
   useEffect(() => {
     ble.connectedDevices.forEach(device => setDeviceName(device.id, device.name));
   }, [ble.connectedDevices, setDeviceName]);
+
+  // Offer to set up threshold alerts the first time a device connects, so the
+  // feature is discovered at the moment it becomes useful. Only once, and only
+  // while no thresholds exist — someone who already set one does not need it.
+  const alerts = useAlertPreferences();
+  const wasConnected = useRef(false);
+  useEffect(() => {
+    const nowConnected = ble.connectedDevices.length > 0;
+    const justConnected = nowConnected && !wasConnected.current;
+    wasConnected.current = nowConnected;
+
+    if (!justConnected || alerts.loading || alerts.promptSeen) return;
+    if (Object.keys(alerts.rules).length > 0) return;
+
+    alerts.markPromptSeen();
+    Alert.alert(t.alertPromptTitle, t.alertPromptBody, [
+      { text: t.alertPromptDismiss, style: 'cancel' },
+      { text: t.alertPromptConfirm, onPress: () => router.push('/alerts') },
+    ]);
+  }, [ble.connectedDevices, alerts, router, t]);
 
   const connectedCount = ble.connectedDevices.length;
   const isConnected = connectedCount > 0;

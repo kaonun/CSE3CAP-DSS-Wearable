@@ -2,7 +2,7 @@
   "expo": {
     "name": "DSS-wearable",
     "slug": "DSS-wearable",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "scheme": "dsswearable",
@@ -17,7 +17,9 @@
         "NFCReaderUsageDescription": "DSS Wearable reads NFC tags to identify which wearable device to connect to."
       },
       "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": ["NDEF"]
+        "com.apple.developer.nfc.readersession.formats": [
+          "NDEF"
+        ]
       }
     },
     "android": {
@@ -35,8 +37,10 @@
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.NFC"
-      ]
+        "android.permission.NFC",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "versionCode": 2
     },
     "web": {
       "output": "static",
@@ -68,7 +72,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.845518508981-fif8i2gdkdorsai0s3tqhmovndhjcldv"
         }
-      ]
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

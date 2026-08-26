@@ -160,6 +160,22 @@ export type Messages = {
   averageRate: string;
   peakRate: string;
   kcalPerMin: string;
+  alerts: string;
+  alertsSubtitle: string;
+  alertsThresholds: string;
+  alertsHelp: string;
+  alertsSettingsHelp: string;
+  alertAbove: string;
+  alertBelow: string;
+  alertValue: string;
+  alertOutOfRange: string;
+  alertTitle: string;
+  alertBodyAbove: string;
+  alertBodyBelow: string;
+  alertPromptTitle: string;
+  alertPromptBody: string;
+  alertPromptConfirm: string;
+  alertPromptDismiss: string;
 };
 
 export type Language =
