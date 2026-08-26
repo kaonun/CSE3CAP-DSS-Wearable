@@ -1,5 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -8,27 +8,32 @@ import {
   ScrollView,
   StyleSheet,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
-import { TextField } from '@/components/ui/text-field';
-import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { useI18n } from '@/i18n';
-import { AuthError, googleSignInConfigured, useAuth } from '@/auth';
+import { ThemedText } from "@/components/themed-text";
+import { Button } from "@/components/ui/button";
+import { TextField } from "@/components/ui/text-field";
+import { MaxContentWidth, Radius, Spacing } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useI18n } from "@/i18n";
+import {
+  AuthError,
+  googleSignInConfigured,
+  useAuth,
+} from "../../services/authServices";
 
-type Mode = 'signIn' | 'register' | 'reset';
+type Mode = "signIn" | "register" | "reset";
 
 export default function LoginScreen() {
   const theme = useTheme();
   const { t } = useI18n();
-  const { signIn, register, resetPassword, signInWithGoogle, configured } = useAuth();
+  const { signIn, register, resetPassword, signInWithGoogle, configured } =
+    useAuth();
 
-  const [mode, setMode] = useState<Mode>('signIn');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<Mode>("signIn");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,8 +72,8 @@ export default function LoginScreen() {
     setError(null);
     setNotice(null);
     try {
-      if (mode === 'register') await register(email, password);
-      else if (mode === 'reset') {
+      if (mode === "register") await register(email, password);
+      else if (mode === "reset") {
         await resetPassword(email);
         setNotice(t.resetEmailSent);
       } else await signIn(email, password);
@@ -79,25 +84,40 @@ export default function LoginScreen() {
     }
   };
 
-  const heading = mode === 'register' ? t.createAccount : mode === 'reset' ? t.resetPassword : t.signIn;
+  const heading =
+    mode === "register"
+      ? t.createAccount
+      : mode === "reset"
+        ? t.resetPassword
+        : t.signIn;
   const subheading =
-    mode === 'register' ? t.createAccountSubtitle : mode === 'reset' ? t.resetSubtitle : t.signInSubtitle;
+    mode === "register"
+      ? t.createAccountSubtitle
+      : mode === "reset"
+        ? t.resetSubtitle
+        : t.signInSubtitle;
   const primaryLabel =
-    mode === 'register' ? t.createAccount : mode === 'reset' ? t.sendResetLink : t.signIn;
+    mode === "register"
+      ? t.createAccount
+      : mode === "reset"
+        ? t.sendResetLink
+        : t.signIn;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
           <ScrollView
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}>
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.brand}>
               <Image
-                source={require('@/assets/images/dss-wearable-logo.png')}
+                source={require("@/assets/images/dss-wearable-logo.png")}
                 style={styles.logo}
                 resizeMode="contain"
                 accessibilityRole="image"
@@ -109,15 +129,27 @@ export default function LoginScreen() {
               <ThemedText type="title1" style={styles.center}>
                 {heading}
               </ThemedText>
-              <ThemedText type="subhead" themeColor="textSecondary" style={styles.center}>
+              <ThemedText
+                type="subhead"
+                themeColor="textSecondary"
+                style={styles.center}
+              >
                 {subheading}
               </ThemedText>
             </View>
 
             {!configured ? (
               <View style={[styles.banner, { backgroundColor: theme.fill }]}>
-                <Ionicons name="information-circle" size={18} color={theme.textSecondary} />
-                <ThemedText type="footnote" themeColor="textSecondary" style={styles.flex}>
+                <Ionicons
+                  name="information-circle"
+                  size={18}
+                  color={theme.textSecondary}
+                />
+                <ThemedText
+                  type="footnote"
+                  themeColor="textSecondary"
+                  style={styles.flex}
+                >
                   {t.notConfigured}
                 </ThemedText>
               </View>
@@ -136,7 +168,7 @@ export default function LoginScreen() {
                 returnKeyType="next"
               />
 
-              {mode !== 'reset' ? (
+              {mode !== "reset" ? (
                 <TextField
                   icon="lock-closed-outline"
                   value={password}
@@ -144,8 +176,12 @@ export default function LoginScreen() {
                   placeholder={t.password}
                   revealable
                   autoCapitalize="none"
-                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                  textContentType={mode === 'register' ? 'newPassword' : 'password'}
+                  autoComplete={
+                    mode === "register" ? "new-password" : "current-password"
+                  }
+                  textContentType={
+                    mode === "register" ? "newPassword" : "password"
+                  }
                   returnKeyType="go"
                   onSubmitEditing={submit}
                 />
@@ -153,7 +189,11 @@ export default function LoginScreen() {
 
               {error ? (
                 <View style={styles.message}>
-                  <Ionicons name="alert-circle" size={16} color={theme.danger} />
+                  <Ionicons
+                    name="alert-circle"
+                    size={16}
+                    color={theme.danger}
+                  />
                   <ThemedText type="footnote" style={{ color: theme.danger }}>
                     {error}
                   </ThemedText>
@@ -162,7 +202,11 @@ export default function LoginScreen() {
 
               {notice ? (
                 <View style={styles.message}>
-                  <Ionicons name="checkmark-circle" size={16} color={theme.success} />
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={16}
+                    color={theme.success}
+                  />
                   <ThemedText type="footnote" style={{ color: theme.success }}>
                     {notice}
                   </ThemedText>
@@ -176,11 +220,12 @@ export default function LoginScreen() {
                 disabled={!configured}
               />
 
-              {mode === 'signIn' ? (
+              {mode === "signIn" ? (
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => switchMode('reset')}
-                  style={styles.inlineLink}>
+                  onPress={() => switchMode("reset")}
+                  style={styles.inlineLink}
+                >
                   <ThemedText type="footnote" style={{ color: theme.tint }}>
                     {t.forgotPassword}
                   </ThemedText>
@@ -188,14 +233,18 @@ export default function LoginScreen() {
               ) : null}
             </View>
 
-            {mode !== 'reset' ? (
+            {mode !== "reset" ? (
               <>
                 <View style={styles.divider}>
-                  <View style={[styles.rule, { backgroundColor: theme.separator }]} />
+                  <View
+                    style={[styles.rule, { backgroundColor: theme.separator }]}
+                  />
                   <ThemedText type="footnote" themeColor="textTertiary">
                     {t.or}
                   </ThemedText>
-                  <View style={[styles.rule, { backgroundColor: theme.separator }]} />
+                  <View
+                    style={[styles.rule, { backgroundColor: theme.separator }]}
+                  />
                 </View>
 
                 <Button
@@ -210,10 +259,17 @@ export default function LoginScreen() {
 
             <Pressable
               accessibilityRole="button"
-              onPress={() => switchMode(mode === 'signIn' ? 'register' : 'signIn')}
-              style={styles.footerLink}>
+              onPress={() =>
+                switchMode(mode === "signIn" ? "register" : "signIn")
+              }
+              style={styles.footerLink}
+            >
               <ThemedText type="footnote" style={{ color: theme.tint }}>
-                {mode === 'signIn' ? t.needAccount : mode === 'register' ? t.haveAccount : t.backToSignIn}
+                {mode === "signIn"
+                  ? t.needAccount
+                  : mode === "register"
+                    ? t.haveAccount
+                    : t.backToSignIn}
               </ThemedText>
             </Pressable>
           </ScrollView>
@@ -229,29 +285,29 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.five,
     gap: Spacing.four,
-    width: '100%',
+    width: "100%",
     maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    alignSelf: "center",
   },
-  brand: { alignItems: 'center' },
+  brand: { alignItems: "center" },
   logo: { width: 168, height: 168 },
   headings: { gap: Spacing.one },
-  center: { textAlign: 'center' },
+  center: { textAlign: "center" },
   banner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: Spacing.two,
     padding: Spacing.three,
     borderRadius: Radius.md,
   },
   form: { gap: Spacing.two + 4 },
-  message: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
-  inlineLink: { alignSelf: 'center', paddingVertical: Spacing.one },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  message: { flexDirection: "row", alignItems: "center", gap: Spacing.one + 2 },
+  inlineLink: { alignSelf: "center", paddingVertical: Spacing.one },
+  divider: { flexDirection: "row", alignItems: "center", gap: Spacing.three },
   rule: { flex: 1, height: StyleSheet.hairlineWidth },
-  footerLink: { alignSelf: 'center', paddingVertical: Spacing.two },
+  footerLink: { alignSelf: "center", paddingVertical: Spacing.two },
 });
