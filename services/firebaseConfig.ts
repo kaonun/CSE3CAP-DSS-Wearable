@@ -1,8 +1,8 @@
+import * as SecureStore from "expo-secure-store";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth, initializeAuth, type Auth } from "firebase/auth";
 // @ts-expect-error - getReactNativePersistence exists in firebase/auth's React Native
 // build at runtime but is missing from its published web-oriented .d.ts (firebase/firebase-js-sdk#9316).
-import * as SecureStore from "expo-secure-store";
 import { getReactNativePersistence } from "firebase/auth";
 import {
   getFirestore,
