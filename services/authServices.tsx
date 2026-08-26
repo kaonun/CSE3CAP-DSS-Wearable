@@ -1,13 +1,19 @@
 import {
+  GoogleSignin,
+  isErrorWithCode,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
+import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  signInAnonymously,
   signInWithCredential,
   signInWithEmailAndPassword,
   signOut,
   type User,
-} from 'firebase/auth';
+} from "firebase/auth";
 import {
   createContext,
   useCallback,
@@ -17,16 +23,11 @@ import {
   useRef,
   useState,
   type ReactNode,
-} from 'react';
-import {
-  GoogleSignin,
-  isErrorWithCode,
-  statusCodes,
-} from '@react-native-google-signin/google-signin';
-import { AppState, View } from 'react-native';
+} from "react";
+import { AppState, View } from "react-native";
 
-import { auth, firebaseConfigured } from '@/firebase';
-import type { Messages } from '@/i18n';
+import type { Messages } from "@/i18n";
+import { auth, firebaseConfigured } from "./firebaseConfig";
 
 /**
  * Google's native sign-in, configured once at module load.
@@ -55,22 +56,22 @@ if (googleSignInConfigured) {
 /** Error keys that map onto translated strings in `Messages`. */
 export type AuthErrorKey = Extract<
   keyof Messages,
-  | 'errInvalidCredentials'
-  | 'errEmailInUse'
-  | 'errWeakPassword'
-  | 'errInvalidEmail'
-  | 'errTooManyRequests'
-  | 'errNetwork'
-  | 'errGeneric'
-  | 'errEmptyFields'
-  | 'errGoogleUnavailable'
+  | "errInvalidCredentials"
+  | "errEmailInUse"
+  | "errWeakPassword"
+  | "errInvalidEmail"
+  | "errTooManyRequests"
+  | "errNetwork"
+  | "errGeneric"
+  | "errEmptyFields"
+  | "errGoogleUnavailable"
 >;
 
 export class AuthError extends Error {
   readonly key: AuthErrorKey;
   constructor(key: AuthErrorKey) {
     super(key);
-    this.name = 'AuthError';
+    this.name = "AuthError";
     this.key = key;
   }
 }
@@ -81,25 +82,28 @@ export class AuthError extends Error {
  * leak which emails are registered.
  */
 function toAuthError(error: unknown): AuthError {
-  const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+  const code =
+    typeof error === "object" && error && "code" in error
+      ? String(error.code)
+      : "";
   switch (code) {
-    case 'auth/invalid-credential':
-    case 'auth/wrong-password':
-    case 'auth/user-not-found':
-    case 'auth/invalid-login-credentials':
-      return new AuthError('errInvalidCredentials');
-    case 'auth/email-already-in-use':
-      return new AuthError('errEmailInUse');
-    case 'auth/weak-password':
-      return new AuthError('errWeakPassword');
-    case 'auth/invalid-email':
-      return new AuthError('errInvalidEmail');
-    case 'auth/too-many-requests':
-      return new AuthError('errTooManyRequests');
-    case 'auth/network-request-failed':
-      return new AuthError('errNetwork');
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+    case "auth/user-not-found":
+    case "auth/invalid-login-credentials":
+      return new AuthError("errInvalidCredentials");
+    case "auth/email-already-in-use":
+      return new AuthError("errEmailInUse");
+    case "auth/weak-password":
+      return new AuthError("errWeakPassword");
+    case "auth/invalid-email":
+      return new AuthError("errInvalidEmail");
+    case "auth/too-many-requests":
+      return new AuthError("errTooManyRequests");
+    case "auth/network-request-failed":
+      return new AuthError("errNetwork");
     default:
-      return new AuthError('errGeneric');
+      return new AuthError("errGeneric");
   }
 }
 
@@ -112,6 +116,7 @@ type AuthValue = {
   loading: boolean;
   configured: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInAnonymously: () => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logOut: () => Promise<void>;
@@ -129,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!auth) return;
-    return onAuthStateChanged(auth, nextUser => {
+    return onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       lastActivity.current = Date.now();
       setLoading(false);
@@ -151,8 +156,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const timer = setInterval(expireIfIdle, IDLE_CHECK_INTERVAL_MS);
-    const subscription = AppState.addEventListener('change', state => {
-      if (state === 'active') expireIfIdle();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") expireIfIdle();
     });
 
     return () => {
@@ -168,8 +173,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       configured: firebaseConfigured,
       markActivity,
       signIn: async (email, password) => {
-        if (!auth) throw new AuthError('errGeneric');
-        if (!email.trim() || !password) throw new AuthError('errEmptyFields');
+        if (!auth) throw new AuthError("errGeneric");
+        if (!email.trim() || !password) throw new AuthError("errEmptyFields");
         try {
           await signInWithEmailAndPassword(auth, email.trim(), password);
           lastActivity.current = Date.now();
@@ -177,9 +182,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw toAuthError(error);
         }
       },
+      signInAnonymously: async () => {
+        if (!auth) throw new AuthError("errGeneric");
+        try {
+          await signInAnonymously(auth);
+          lastActivity.current = Date.now();
+        } catch (error) {
+          throw toAuthError(error);
+        }
+      },
       register: async (email, password) => {
-        if (!auth) throw new AuthError('errGeneric');
-        if (!email.trim() || !password) throw new AuthError('errEmptyFields');
+        if (!auth) throw new AuthError("errGeneric");
+        if (!email.trim() || !password) throw new AuthError("errEmptyFields");
         try {
           await createUserWithEmailAndPassword(auth, email.trim(), password);
           lastActivity.current = Date.now();
@@ -187,9 +201,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw toAuthError(error);
         }
       },
-      resetPassword: async email => {
-        if (!auth) throw new AuthError('errGeneric');
-        if (!email.trim()) throw new AuthError('errEmptyFields');
+      resetPassword: async (email) => {
+        if (!auth) throw new AuthError("errGeneric");
+        if (!email.trim()) throw new AuthError("errEmptyFields");
         try {
           await sendPasswordResetEmail(auth, email.trim());
         } catch (error) {
@@ -205,20 +219,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (auth) await signOut(auth).catch(() => undefined);
       },
       signInWithGoogle: async () => {
-        if (!auth || !googleSignInConfigured) throw new AuthError('errGeneric');
+        if (!auth || !googleSignInConfigured) throw new AuthError("errGeneric");
         try {
           // Android only; resolves immediately elsewhere.
-          await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+          await GoogleSignin.hasPlayServices({
+            showPlayServicesUpdateDialog: true,
+          });
 
           const response = await GoogleSignin.signIn();
           // Backing out of the account picker is a choice, not a failure, so it
           // returns rather than throwing and does not raise an error banner.
-          if (response.type !== 'success') return false;
+          if (response.type !== "success") return false;
 
           const idToken = response.data?.idToken;
-          if (!idToken) throw new AuthError('errGeneric');
+          if (!idToken) throw new AuthError("errGeneric");
 
-          await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+          await signInWithCredential(
+            auth,
+            GoogleAuthProvider.credential(idToken),
+          );
           lastActivity.current = Date.now();
           return true;
         } catch (error) {
@@ -230,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // A second tap while the picker is already open.
                 return false;
               case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
-                throw new AuthError('errGoogleUnavailable');
+                throw new AuthError("errGoogleUnavailable");
             }
           }
           if (error instanceof AuthError) throw error;
@@ -246,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const value = useContext(AuthContext);
-  if (!value) throw new Error('useAuth must be used inside AuthProvider');
+  if (!value) throw new Error("useAuth must be used inside AuthProvider");
   return value;
 }
 
@@ -262,7 +281,8 @@ export function ActivityTracker({ children }: { children: ReactNode }) {
       onStartShouldSetResponderCapture={() => {
         markActivity();
         return false;
-      }}>
+      }}
+    >
       {children}
     </View>
   );

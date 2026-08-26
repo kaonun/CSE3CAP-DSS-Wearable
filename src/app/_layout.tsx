@@ -1,21 +1,28 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import * as SplashScreen from 'expo-splash-screen';
-import { ActivityIndicator, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { ActivityIndicator, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppNavigator from '@/components/app-navigator';
-import { Colors } from '@/constants/theme';
-import { ReadingSyncProvider } from '@/data/reading-sync-context';
-import { DeviceNamesProvider } from '@/device-names';
-import { I18nProvider, useI18n } from '@/i18n';
-import { MetricPreferenceProvider } from '@/metrics';
-import { ThemePreferenceProvider, useThemePreference } from '@/theme-preference';
-import { ActivityTracker, AuthProvider, useAuth } from '@/auth';
+import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import AppNavigator from "@/components/app-navigator";
+import { Colors } from "@/constants/theme";
+import { ReadingSyncProvider } from "@/data/reading-sync-context";
+import { DeviceNamesProvider } from "@/device-names";
+import { I18nProvider, useI18n } from "@/i18n";
+import { MetricPreferenceProvider } from "@/metrics";
+import {
+  ThemePreferenceProvider,
+  useThemePreference,
+} from "@/theme-preference";
+import {
+  ActivityTracker,
+  AuthProvider,
+  useAuth,
+} from "../../services/authServices";
 // Lives outside app/ on purpose: the auth gate renders it directly, and any
 // file under app/ is registered as a route and shows up as its own tab.
-import LoginScreen from '@/components/login-screen';
+import LoginScreen from "@/components/login-screen";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -41,11 +48,11 @@ export default function RootLayout() {
 
 function RootTheme() {
   const { resolvedScheme } = useThemePreference();
-  const isDark = resolvedScheme === 'dark';
+  const isDark = resolvedScheme === "dark";
 
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <StatusBar style={isDark ? "light" : "dark"} />
       <AuthGate />
     </ThemeProvider>
   );
@@ -62,7 +69,14 @@ function AuthGate() {
   // screen at an already-signed-in user.
   if ((configured && authLoading) || languageLoading || themeLoading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: theme.background,
+        }}
+      >
         <ActivityIndicator color={theme.tint} />
       </View>
     );
