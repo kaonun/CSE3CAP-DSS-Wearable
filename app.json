@@ -73,11 +73,16 @@
           "iosUrlScheme": "com.googleusercontent.apps.845518508981-fif8i2gdkdorsai0s3tqhmovndhjcldv"
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      "expo-build-properties",
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "router": {},

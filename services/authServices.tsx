@@ -16,6 +16,7 @@ import {
 } from "firebase/auth";
 import {
   createContext,
+  createElement,
   useCallback,
   useContext,
   useEffect,
@@ -260,7 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, loading, markActivity],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return createElement(AuthContext.Provider, { value }, children);
 }
 
 export function useAuth() {
@@ -276,14 +277,12 @@ export function useAuth() {
 export function ActivityTracker({ children }: { children: ReactNode }) {
   const { markActivity } = useAuth();
   return (
-    <View
-      style={{ flex: 1 }}
-      onStartShouldSetResponderCapture={() => {
+    createElement(View, {
+      style: { flex: 1 },
+      onStartShouldSetResponderCapture: () => {
         markActivity();
         return false;
-      }}
-    >
-      {children}
-    </View>
+      },
+    }, children)
   );
 }
