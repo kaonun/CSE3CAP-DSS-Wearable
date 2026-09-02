@@ -160,11 +160,11 @@ The project will continue to be refined and tested across the remaining sprints,
 DSS Wearable is being developed by **FusionFive** as part of the CSE3CAP Capstone Project.
 Team members:
 
-- Ali Mhanna
-- Tanish Sudan
-- Edris Nezrabi
 - Caleb Weir
+- Tanish Sudan
 - Jacob Biggs
+- Edris Nezrabi
+- Ali Mhanna
 
 
 ## Project Development
